@@ -830,8 +830,7 @@ function renderHoleImage() {
   const url = holeImages[currentCourse.id] && holeImages[currentCourse.id][currentHole];
   const btn = document.getElementById("imgCameraBtn");
   if (url) {
-    document.body.style.backgroundImage =
-      `linear-gradient(rgba(247,248,244,.74),rgba(247,248,244,.74)),url("${url}")`;
+    document.body.style.backgroundImage = `url("${url}")`;
     if (btn) btn.classList.add("has-img");
   } else {
     document.body.style.backgroundImage = "";
