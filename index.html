@@ -1505,12 +1505,6 @@ function hideWelcomeScreen() {
   document.getElementById("welcomeOverlay").classList.remove("open");
 }
 
-function esc(s) {
-  return String(s)
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
-
 function renderCoursePicker() {
   const list = document.getElementById("coursePickerList");
   const courses = courseFilterMode === "mine"
