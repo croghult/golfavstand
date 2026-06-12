@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Golfavstånd</title>
+<style>
+  :root{
+    --bg:#F7F8F4;
+    --ink:#16231B;
+    --muted:#6B7A6F;
+    --line:#DCE3DB;
+    --green:#2F7D52;
+    --green-dark:#235E3D;
+    --red:#C2543A;
+    --card:#FFFFFF;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:96px;
+  }
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px 6px;
+  }
+  header h1{font-size:15px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .gps{
+    font-size:12px;font-weight:600;
+    padding:4px 10px;border-radius:99px;
+    border:1px solid var(--line);background:var(--card);
+    font-variant-numeric:tabular-nums;
+  }
+  .gps.good{color:var(--green-dark);border-color:#BFD9C9}
+  .gps.ok{color:#8A6A1F;border-color:#E4D3A4}
+  .gps.bad{color:var(--red);border-color:#E3BBAE}
+
+  .course-row{padding:6px 16px 2px}
+  select#courseSelect{
+    width:100%;
+    font-size:17px;font-weight:600;color:var(--ink);
+    padding:10px 12px;border-radius:var(--radius);
+    border:1px solid var(--line);background:var(--card);
+    -webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7A6F' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center;
+  }
+
+  .holes{
+    display:flex;gap:8px;overflow-x:auto;
+    padding:12px 16px;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .holes::-webkit-scrollbar{display:none}
+  .hole-chip{
+    flex:0 0 auto;width:44px;height:44px;border-radius:50%;
+    border:1px solid var(--line);background:var(--card);color:var(--ink);
+    font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;
+  }
+  .hole-chip.active{background:var(--green);border-color:var(--green);color:#fff}
+
+  .readout{
+    margin:6px 16px 14px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:22px 18px 18px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }
+  .readout::after{
+    content:"";position:absolute;top:0;left:50%;
+    width:2px;height:14px;background:var(--red);
+  }
+  .edit-green{
+    position:absolute;top:10px;right:10px;
+    font-size:12px;font-weight:600;color:var(--muted);
+    background:var(--bg);border:1px solid var(--line);
+    border-radius:99px;padding:5px 12px;
+  }
+  .readout .label{
+    font-size:11px;font-weight:700;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted);
+  }
+  .readout .mid{
+    font-size:88px;font-weight:800;line-height:1;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:-0.02em;
+    margin:4px 0 2px;
+  }
+  .readout .mid small{font-size:24px;font-weight:600;color:var(--muted);margin-left:4px}
+  .fb{
+    display:flex;justify-content:space-between;
+    margin-top:14px;padding-top:14px;
+    border-top:1px solid var(--line);
+  }
+  .fb div{flex:1}
+  .fb .num{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+  .nopos{padding:18px 6px 8px;color:var(--muted);font-size:15px;line-height:1.5}
+  .nopos button{
+    margin-top:12px;font-size:14px;font-weight:600;
+    padding:8px 16px;border-radius:99px;
+    border:1px solid var(--line);background:var(--bg);color:var(--ink);
+  }
+
+  .poi-section{padding:0 16px}
+  .poi-section h2{
+    font-size:11px;font-weight:700;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted);
+    margin:8px 2px 8px;
+  }
+  .poi{
+    display:flex;align-items:center;gap:10px;
+    background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:12px 14px;margin-bottom:8px;
+  }
+  .poi .name{flex:1;font-size:16px;font-weight:600;min-width:0;overflow-wrap:anywhere}
+  .poi .dist{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .poi .dist small{font-size:13px;font-weight:500;color:var(--muted)}
+  .poi .edit,.poi .del{
+    border:none;background:none;color:var(--muted);
+    font-size:17px;line-height:1;padding:6px;
+  }
+  .poi .del.confirm{color:#fff;background:var(--red);border-radius:8px;font-size:13px;font-weight:600;padding:6px 10px}
+  .poi-empty{color:var(--muted);font-size:14px;padding:6px 2px 12px}
+
+  .add-bar{
+    position:fixed;bottom:0;left:0;right:0;
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, var(--bg) 70%, rgba(247,248,244,0));
+  }
+  .add-bar button{
+    width:100%;padding:16px;
+    font-size:17px;font-weight:700;color:#fff;
+    background:var(--green);border:none;border-radius:var(--radius);
+  }
+
+  /* Sheets */
+  .overlay{
+    position:fixed;inset:0;background:rgba(22,35,27,.45);
+    display:none;align-items:flex-end;justify-content:center;
+    z-index:10;
+  }
+  .overlay.open{display:flex}
+  .sheet{
+    background:var(--card);width:100%;max-width:520px;
+    border-radius:18px 18px 0 0;
+    padding:20px 20px calc(20px + env(safe-area-inset-bottom));
+    max-height:88vh;overflow-y:auto;
+  }
+  .sheet h3{font-size:17px;font-weight:700;margin-bottom:12px}
+  .sheet label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+  .sheet input,.sheet select,.sheet textarea{
+    width:100%;font-size:16px;padding:11px 12px;
+    border:1px solid var(--line);border-radius:10px;background:var(--bg);
+    color:var(--ink);font-variant-numeric:tabular-nums;
+  }
+  .sheet input.invalid{border-color:var(--red)}
+  .coord-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .coord-grid .full{grid-column:1 / -1}
+  .group-label{
+    font-size:12px;font-weight:700;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--green-dark);
+    margin:16px 0 2px;
+  }
+  .group-label:first-of-type{margin-top:4px}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4}
+  .err{font-size:13px;color:var(--red);margin-top:10px;display:none}
+  .err.show{display:block}
+  .inline-btn{
+    margin-top:10px;font-size:13px;font-weight:600;
+    padding:8px 14px;border-radius:99px;
+    border:1px solid var(--line);background:var(--bg);color:var(--ink);
+  }
+  .sheet .actions{display:flex;gap:10px;margin-top:18px}
+  .sheet .actions button{
+    flex:1;padding:13px;font-size:16px;font-weight:700;border-radius:10px;border:none;
+  }
+  .btn-cancel{background:var(--bg);color:var(--ink);border:1px solid var(--line) !important}
+  .btn-save{background:var(--green);color:#fff}
+  .code-view{display:none}
+  .code-view.open{display:block}
+  .code-view textarea{
+    font-family:ui-monospace,Menlo,monospace;font-size:12px;
+    height:240px;white-space:pre;
+  }
+  .form-view.hidden{display:none}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Golfavstånd</h1>
+  <span class="gps bad" id="gpsStatus">Ingen GPS</span>
+</header>
+
+<div class="course-row">
+  <select id="courseSelect"></select>
+</div>
+
+<div class="holes" id="holeChips"></div>
+
+<div class="readout" id="readout"></div>
+
+<div class="poi-section">
+  <h2>Egna markeringar – hål <span id="poiHoleNum">1</span></h2>
+  <div id="poiList"></div>
+</div>
+
+<div class="add-bar">
+  <button id="addPoiBtn">Lägg till markering</button>
+</div>
+
+<!-- Sheet: markering (ny/redigera) -->
+<div class="overlay" id="poiOverlay">
+  <div class="sheet">
+    <h3 id="poiSheetTitle">Ny markering</h3>
+    <label for="poiName">Namn</label>
+    <input id="poiName" type="text" placeholder="T.ex. Stora eken, Bunker vänster" autocomplete="off">
+    <label for="poiHoleSelect">Hör till hål</label>
+    <select id="poiHoleSelect"></select>
+    <div class="coord-grid">
+      <div>
+        <label for="poiLat">Latitud</label>
+        <input id="poiLat" type="text" inputmode="decimal" placeholder="59.301234">
+      </div>
+      <div>
+        <label for="poiLng">Longitud</label>
+        <input id="poiLng" type="text" inputmode="decimal" placeholder="18.102345">
+      </div>
+    </div>
+    <div class="hint">Tips: klistra in hela paret från Google Maps (t.ex. "59.301234, 18.102345") i latitud-fältet så delas det upp automatiskt.</div>
+    <button class="inline-btn" id="useGpsBtn">Använd min position</button>
+    <div class="err" id="poiErr"></div>
+    <div class="actions">
+      <button class="btn-cancel" id="cancelPoi">Avbryt</button>
+      <button class="btn-save" id="savePoi">Spara</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sheet: redigera green -->
+<div class="overlay" id="greenOverlay">
+  <div class="sheet">
+    <div class="form-view" id="greenForm">
+      <h3 id="greenSheetTitle">Green – hål 1</h3>
+      <div class="group-label">Fram</div>
+      <div class="coord-grid">
+        <div><label>Latitud</label><input id="gFrontLat" type="text" inputmode="decimal"></div>
+        <div><label>Longitud</label><input id="gFrontLng" type="text" inputmode="decimal"></div>
+      </div>
+      <div class="group-label">Mitt</div>
+      <div class="coord-grid">
+        <div><label>Latitud</label><input id="gMidLat" type="text" inputmode="decimal"></div>
+        <div><label>Longitud</label><input id="gMidLng" type="text" inputmode="decimal"></div>
+      </div>
+      <div class="group-label">Bak</div>
+      <div class="coord-grid">
+        <div><label>Latitud</label><input id="gBackLat" type="text" inputmode="decimal"></div>
+        <div><label>Longitud</label><input id="gBackLng" type="text" inputmode="decimal"></div>
+      </div>
+      <div class="hint">Klistra gärna in hela koordinatparet från Google Maps i ett latitud-fält så fylls båda fälten i.</div>
+      <button class="inline-btn" id="showCodeBtn">Visa banans data som kod</button>
+      <div class="err" id="greenErr"></div>
+      <div class="actions">
+        <button class="btn-cancel" id="cancelGreen">Avbryt</button>
+        <button class="btn-save" id="saveGreen">Spara</button>
+      </div>
+    </div>
+    <div class="code-view" id="codeView">
+      <h3>Banans data som kod</h3>
+      <div class="hint" style="margin:0 0 10px">Inklusive dina sparade ändringar. Klistra in i COURSES-listan i HTML-filen om du vill göra koden till permanent grunddata. Egna markeringar ingår inte – de ligger kvar i appens lagring.</div>
+      <textarea id="codeArea" readonly></textarea>
+      <div class="actions">
+        <button class="btn-cancel" id="backFromCode">Tillbaka</button>
+        <button class="btn-save" id="copyCode">Kopiera</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   BANDATA – grunddata som du redigerar i koden.
+
+   Hämta koordinater från Google Maps i satellitvy:
+   högerklicka (eller långtryck i mobilen) på greenens framkant,
+   mitt och bakkant, kopiera koordinaterna och klistra in nedan.
+
+   Du kan också redigera greenkoordinater direkt i appen
+   ("Redigera"-knappen på avståndskortet). Sådana ändringar sparas
+   i appens lagring och gäller framför värdena här i koden.
+   Knappen "Visa banans data som kod" ger dig färdig kod att
+   klistra tillbaka hit när du vill göra ändringarna permanenta.
+
+   Exempelbanan nedan har påhittade koordinater – ersätt dem!
+   ================================================================ */
+
+   
+const COURSES = [
+    {
+    id: "KDRGK",
+    name: "Kungliga Drottningholms GK",
+    holes: [
+      { hole: 1, green: { front:{lat:59.315700,lng:17.859220}, middle:{lat:59.315384,lng:17.859145}, back:{lat:59.315214,lng:17.859432} } },
+      { hole: 2, green: { front:{lat:59.30340,lng:18.10400}, middle:{lat:59.30351,lng:18.10400}, back:{lat:59.30362,lng:18.10400} } },
+      { hole: 3, green: { front:{lat:59.30560,lng:18.10120}, middle:{lat:59.30571,lng:18.10120}, back:{lat:59.30582,lng:18.10120} } },
+      { hole: 4, green: { front:{lat:59.30790,lng:18.09800}, middle:{lat:59.30801,lng:18.09800}, back:{lat:59.30812,lng:18.09800} } },
+      { hole: 5, green: { front:{lat:59.30990,lng:18.10250}, middle:{lat:59.31001,lng:18.10250}, back:{lat:59.31012,lng:18.10250} } },
+      { hole: 6, green: { front:{lat:59.30770,lng:18.10700}, middle:{lat:59.30781,lng:18.10700}, back:{lat:59.30792,lng:18.10700} } },
+      { hole: 7, green: { front:{lat:59.30540,lng:18.10950}, middle:{lat:59.30551,lng:18.10950}, back:{lat:59.30562,lng:18.10950} } },
+      { hole: 8, green: { front:{lat:59.30310,lng:18.10780}, middle:{lat:59.30321,lng:18.10780}, back:{lat:59.30332,lng:18.10780} } },
+      { hole: 9, green: { front:{lat:59.30120,lng:18.10380}, middle:{lat:59.30131,lng:18.10380}, back:{lat:59.30142,lng:18.10380} } }
+    ]
+  }
+];
+/* ============== SLUT PÅ BANDATA ============== */
+
+/* ---- Lagring ----
+   I Claude-artifacten används window.storage.
+   Hostar du filen själv (t.ex. GitHub Pages) används
+   webbläsarens lokala lagring i stället. */
+const store = (() => {
+  if (window.storage) return window.storage;
+  let ls = null;
+  try {
+    const t = "__golf_test__";
+    window.localStorage.setItem(t, "1");
+    window.localStorage.removeItem(t);
+    ls = window.localStorage;
+  } catch (e) { ls = null; }
+  const mem = {};
+  return {
+    async get(key) {
+      const v = ls ? ls.getItem("golf:" + key) : (key in mem ? mem[key] : null);
+      if (v === null || v === undefined) throw new Error("not found");
+      return { key, value: v };
+    },
+    async set(key, value) {
+      if (ls) ls.setItem("golf:" + key, value); else mem[key] = value;
+      return { key, value };
+    }
+  };
+})();
+
+/* ---- Tillstånd ---- */
+let currentCourse = COURSES[0];
+let currentHole = currentCourse.holes[0].hole;
+let position = null;            // {lat, lng, accuracy}
+let pois = {};                  // { courseId: { hole: [ {id,name,lat,lng} ] } }
+let greenEdits = {};            // { courseId: { hole: {front,middle,back} } }
+let editingPoi = null;          // {hole, id} när en markering redigeras
+
+/* ---- Hjälpfunktioner ---- */
+function haversine(a, b) {
+  const R = 6371000, toRad = x => x * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat/2)**2 +
+            Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+const fmt = m => Math.round(m);
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function holeData() {
+  const base = currentCourse.holes.find(h => h.hole === currentHole);
+  const edit = greenEdits[currentCourse.id] && greenEdits[currentCourse.id][currentHole];
+  return edit ? { hole: base.hole, green: edit } : base;
+}
+function greenFor(courseId, hole) {
+  const base = COURSES.find(c => c.id === courseId).holes.find(h => h.hole === hole);
+  const edit = greenEdits[courseId] && greenEdits[courseId][hole];
+  return edit || base.green;
+}
+function holePois() {
+  return (pois[currentCourse.id] && pois[currentCourse.id][currentHole]) || [];
+}
+
+/* Klistra in "lat, lng" i ett lat-fält => dela upp i båda fälten */
+function attachPairSplit(latInput, lngInput) {
+  latInput.addEventListener("input", () => {
+    const m = latInput.value.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+    if (m) { latInput.value = m[1]; lngInput.value = m[2]; }
+  });
+}
+
+function readCoord(latInput, lngInput) {
+  const lat = parseFloat(latInput.value.replace(",", "."));
+  const lng = parseFloat(lngInput.value.replace(",", "."));
+  const ok = isFinite(lat) && lat >= -90 && lat <= 90 &&
+             isFinite(lng) && lng >= -180 && lng <= 180;
+  latInput.classList.toggle("invalid", !isFinite(lat) || lat < -90 || lat > 90);
+  lngInput.classList.toggle("invalid", !isFinite(lng) || lng < -180 || lng > 180);
+  return ok ? { lat, lng } : null;
+}
+
+/* ---- Lagring av data ---- */
+async function loadStored() {
+  try { pois = JSON.parse((await store.get("pois")).value) || {}; }
+  catch (e) { pois = {}; }
+  try { greenEdits = JSON.parse((await store.get("greens")).value) || {}; }
+  catch (e) { greenEdits = {}; }
+}
+async function savePois() {
+  try { await store.set("pois", JSON.stringify(pois)); }
+  catch (e) { console.error("Kunde inte spara markeringar:", e); }
+}
+async function saveGreenEdits() {
+  try { await store.set("greens", JSON.stringify(greenEdits)); }
+  catch (e) { console.error("Kunde inte spara greendata:", e); }
+}
+
+/* ---- Rendering ---- */
+function renderCourseSelect() {
+  const sel = document.getElementById("courseSelect");
+  sel.innerHTML = COURSES.map(c =>
+    `<option value="${c.id}"${c.id===currentCourse.id?" selected":""}>${esc(c.name)}</option>`
+  ).join("");
+}
+
+function renderHoleChips() {
+  const wrap = document.getElementById("holeChips");
+  wrap.innerHTML = currentCourse.holes.map(h =>
+    `<button class="hole-chip${h.hole===currentHole?" active":""}" data-hole="${h.hole}">${h.hole}</button>`
+  ).join("");
+  wrap.querySelectorAll(".hole-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      currentHole = Number(btn.dataset.hole);
+      renderHoleChips();
+      renderReadout();
+      renderPois();
+    });
+  });
+}
+
+function renderReadout() {
+  const el = document.getElementById("readout");
+  const h = holeData();
+  let inner = `<button class="edit-green" id="editGreenBtn">Redigera</button>`;
+  if (!position) {
+    inner += `
+      <div class="label">Hål ${currentHole}</div>
+      <div class="nopos">Väntar på GPS-position …<br>
+        Tillåt platsåtkomst när webbläsaren frågar.
+        <br><button id="testPosBtn">Använd testposition</button>
+      </div>`;
+  } else {
+    const dF = fmt(haversine(position, h.green.front));
+    const dM = fmt(haversine(position, h.green.middle));
+    const dB = fmt(haversine(position, h.green.back));
+    inner += `
+      <div class="label">Hål ${currentHole} · Mitten av green</div>
+      <div class="mid">${dM}<small>m</small></div>
+      <div class="fb">
+        <div><div class="label">Fram</div><div class="num">${dF}</div></div>
+        <div><div class="label">Bak</div><div class="num">${dB}</div></div>
+      </div>`;
+  }
+  el.innerHTML = inner;
+  document.getElementById("editGreenBtn").addEventListener("click", openGreenSheet);
+  const tBtn = document.getElementById("testPosBtn");
+  if (tBtn) tBtn.addEventListener("click", () => {
+    const g = currentCourse.holes[0].green.middle;
+    setPosition({ lat: g.lat - 0.0014, lng: g.lng - 0.0009, accuracy: 5, test: true });
+  });
+}
+
+function renderPois() {
+  document.getElementById("poiHoleNum").textContent = currentHole;
+  const list = document.getElementById("poiList");
+  let items = holePois().slice();
+  if (position) {
+    items.forEach(p => p._d = haversine(position, p));
+    items.sort((a, b) => a._d - b._d);
+  }
+  if (items.length === 0) {
+    list.innerHTML = `<div class="poi-empty">Inga markeringar för det här hålet ännu. Stå vid trädet eller bunkern och tryck på knappen nedan – eller lägg in koordinater manuellt.</div>`;
+    return;
+  }
+  list.innerHTML = items.map(p => `
+    <div class="poi" data-id="${p.id}">
+      <span class="name">${esc(p.name)}</span>
+      <span class="dist">${position ? fmt(p._d) + ' <small>m</small>' : "–"}</span>
+      <button class="edit" aria-label="Redigera ${esc(p.name)}">✎</button>
+      <button class="del" aria-label="Ta bort ${esc(p.name)}">✕</button>
+    </div>`).join("");
+  list.querySelectorAll(".edit").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.closest(".poi").dataset.id;
+      const p = holePois().find(x => x.id === id);
+      if (p) openPoiSheet({ hole: currentHole, poi: p });
+    });
+  });
+  list.querySelectorAll(".del").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!btn.classList.contains("confirm")) {
+        btn.classList.add("confirm");
+        btn.textContent = "Ta bort?";
+        setTimeout(() => { btn.classList.remove("confirm"); btn.textContent = "✕"; }, 3000);
+        return;
+      }
+      const id = btn.closest(".poi").dataset.id;
+      const arr = holePois();
+      const idx = arr.findIndex(p => p.id === id);
+      if (idx > -1) arr.splice(idx, 1);
+      savePois();
+      renderPois();
+    });
+  });
+}
+
+/* ---- GPS ---- */
+function setPosition(pos) {
+  position = pos;
+  const s = document.getElementById("gpsStatus");
+  if (pos.test) {
+    s.textContent = "Testläge";
+    s.className = "gps ok";
+  } else {
+    const acc = Math.round(pos.accuracy);
+    s.textContent = "±" + acc + " m";
+    s.className = "gps " + (acc <= 10 ? "good" : acc <= 25 ? "ok" : "bad");
+  }
+  renderReadout();
+  renderPois();
+}
+
+function startGps() {
+  if (!("geolocation" in navigator)) return;
+  navigator.geolocation.watchPosition(
+    p => setPosition({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+    err => console.warn("GPS-fel:", err.message),
+    { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 }
+  );
+}
+
+/* ---- Sheet: markering ---- */
+const poiOverlay = document.getElementById("poiOverlay");
+const poiLat = document.getElementById("poiLat");
+const poiLng = document.getElementById("poiLng");
+attachPairSplit(poiLat, poiLng);
+
+function openPoiSheet(existing) {
+  const title = document.getElementById("poiSheetTitle");
+  const nameEl = document.getElementById("poiName");
+  const holeSel = document.getElementById("poiHoleSelect");
+  document.getElementById("poiErr").classList.remove("show");
+  poiLat.classList.remove("invalid"); poiLng.classList.remove("invalid");
+
+  holeSel.innerHTML = currentCourse.holes.map(h =>
+    `<option value="${h.hole}">Hål ${h.hole}</option>`
+  ).join("");
+
+  if (existing) {
+    editingPoi = { hole: existing.hole, id: existing.poi.id };
+    title.textContent = "Redigera markering";
+    nameEl.value = existing.poi.name;
+    holeSel.value = existing.hole;
+    poiLat.value = existing.poi.lat.toFixed(6);
+    poiLng.value = existing.poi.lng.toFixed(6);
+  } else {
+    editingPoi = null;
+    title.textContent = "Ny markering";
+    nameEl.value = "";
+    holeSel.value = currentHole;
+    if (position) {
+      poiLat.value = position.lat.toFixed(6);
+      poiLng.value = position.lng.toFixed(6);
+    } else {
+      poiLat.value = ""; poiLng.value = "";
+    }
+  }
+  poiOverlay.classList.add("open");
+  if (!existing) setTimeout(() => nameEl.focus(), 50);
+}
+
+function closePoiSheet() {
+  poiOverlay.classList.remove("open");
+  editingPoi = null;
+}
+
+function savePoiFromSheet() {
+  const err = document.getElementById("poiErr");
+  const name = document.getElementById("poiName").value.trim();
+  const hole = Number(document.getElementById("poiHoleSelect").value);
+  const coord = readCoord(poiLat, poiLng);
+  if (!name) { err.textContent = "Ge markeringen ett namn."; err.classList.add("show"); return; }
+  if (!coord) { err.textContent = "Kontrollera koordinaterna – latitud och longitud måste vara giltiga tal."; err.classList.add("show"); return; }
+
+  if (!pois[currentCourse.id]) pois[currentCourse.id] = {};
+  if (!pois[currentCourse.id][hole]) pois[currentCourse.id][hole] = [];
+
+  if (editingPoi) {
+    const oldArr = pois[currentCourse.id][editingPoi.hole] || [];
+    const idx = oldArr.findIndex(p => p.id === editingPoi.id);
+    if (idx > -1) {
+      const p = oldArr[idx];
+      p.name = name; p.lat = coord.lat; p.lng = coord.lng;
+      if (hole !== editingPoi.hole) {
+        oldArr.splice(idx, 1);
+        pois[currentCourse.id][hole].push(p);
+      }
+    }
+  } else {
+    pois[currentCourse.id][hole].push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name, lat: coord.lat, lng: coord.lng
+    });
+  }
+  savePois();
+  closePoiSheet();
+  if (hole !== currentHole) {
+    currentHole = hole;
+    renderHoleChips();
+    renderReadout();
+  }
+  renderPois();
+}
+
+/* ---- Sheet: green ---- */
+const greenOverlay = document.getElementById("greenOverlay");
+const gInputs = {
+  front:  [document.getElementById("gFrontLat"), document.getElementById("gFrontLng")],
+  middle: [document.getElementById("gMidLat"),   document.getElementById("gMidLng")],
+  back:   [document.getElementById("gBackLat"),  document.getElementById("gBackLng")]
+};
+Object.values(gInputs).forEach(([la, ln]) => attachPairSplit(la, ln));
+
+function openGreenSheet() {
+  document.getElementById("greenSheetTitle").textContent = "Green – hål " + currentHole;
+  document.getElementById("greenErr").classList.remove("show");
+  const g = holeData().green;
+  for (const part of ["front", "middle", "back"]) {
+    const [la, ln] = gInputs[part];
+    la.value = g[part].lat.toFixed(6);
+    ln.value = g[part].lng.toFixed(6);
+    la.classList.remove("invalid"); ln.classList.remove("invalid");
+  }
+  document.getElementById("codeView").classList.remove("open");
+  document.getElementById("greenForm").classList.remove("hidden");
+  greenOverlay.classList.add("open");
+}
+
+function closeGreenSheet() {
+  greenOverlay.classList.remove("open");
+}
+
+function saveGreenFromSheet() {
+  const err = document.getElementById("greenErr");
+  const result = {};
+  for (const part of ["front", "middle", "back"]) {
+    const coord = readCoord(gInputs[part][0], gInputs[part][1]);
+    if (!coord) {
+      err.textContent = "Kontrollera koordinaterna – alla sex fälten måste vara giltiga tal.";
+      err.classList.add("show");
+      return;
+    }
+    result[part] = coord;
+  }
+  if (!greenEdits[currentCourse.id]) greenEdits[currentCourse.id] = {};
+  greenEdits[currentCourse.id][currentHole] = result;
+  saveGreenEdits();
+  closeGreenSheet();
+  renderReadout();
+}
+
+/* ---- Kodexport ---- */
+function buildCourseCode(course) {
+  const num = n => n.toFixed(6);
+  const lines = course.holes.map(h => {
+    const g = greenFor(course.id, h.hole);
+    return `      { hole: ${h.hole}, green: { ` +
+      `front:{lat:${num(g.front.lat)},lng:${num(g.front.lng)}}, ` +
+      `middle:{lat:${num(g.middle.lat)},lng:${num(g.middle.lng)}}, ` +
+      `back:{lat:${num(g.back.lat)},lng:${num(g.back.lng)}} } }`;
+  });
+  return `  {\n    id: ${JSON.stringify(course.id)},\n    name: ${JSON.stringify(course.name)},\n    holes: [\n` +
+         lines.join(",\n") + `\n    ]\n  }`;
+}
+
+function showCodeView() {
+  document.getElementById("codeArea").value = buildCourseCode(currentCourse);
+  document.getElementById("greenForm").classList.add("hidden");
+  document.getElementById("codeView").classList.add("open");
+}
+function hideCodeView() {
+  document.getElementById("codeView").classList.remove("open");
+  document.getElementById("greenForm").classList.remove("hidden");
+}
+function copyCode() {
+  const ta = document.getElementById("codeArea");
+  ta.focus(); ta.select();
+  const done = () => {
+    const btn = document.getElementById("copyCode");
+    btn.textContent = "Kopierat!";
+    setTimeout(() => { btn.textContent = "Kopiera"; }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ta.value).then(done).catch(() => {
+      try { document.execCommand("copy"); done(); } catch (e) {}
+    });
+  } else {
+    try { document.execCommand("copy"); done(); } catch (e) {}
+  }
+}
+
+/* ---- Init & händelser ---- */
+document.getElementById("courseSelect").addEventListener("change", e => {
+  currentCourse = COURSES.find(c => c.id === e.target.value);
+  currentHole = currentCourse.holes[0].hole;
+  renderHoleChips();
+  renderReadout();
+  renderPois();
+});
+document.getElementById("addPoiBtn").addEventListener("click", () => openPoiSheet(null));
+document.getElementById("cancelPoi").addEventListener("click", closePoiSheet);
+document.getElementById("savePoi").addEventListener("click", savePoiFromSheet);
+document.getElementById("useGpsBtn").addEventListener("click", () => {
+  if (!position) {
+    const err = document.getElementById("poiErr");
+    err.textContent = "Ingen GPS-position tillgänglig ännu.";
+    err.classList.add("show");
+    return;
+  }
+  poiLat.value = position.lat.toFixed(6);
+  poiLng.value = position.lng.toFixed(6);
+});
+document.getElementById("poiName").addEventListener("keydown", e => {
+  if (e.key === "Enter") savePoiFromSheet();
+});
+poiOverlay.addEventListener("click", e => { if (e.target === poiOverlay) closePoiSheet(); });
+
+document.getElementById("cancelGreen").addEventListener("click", closeGreenSheet);
+document.getElementById("saveGreen").addEventListener("click", saveGreenFromSheet);
+document.getElementById("showCodeBtn").addEventListener("click", showCodeView);
+document.getElementById("backFromCode").addEventListener("click", hideCodeView);
+document.getElementById("copyCode").addEventListener("click", copyCode);
+greenOverlay.addEventListener("click", e => { if (e.target === greenOverlay) closeGreenSheet(); });
+
+(async function init() {
+  await loadStored();
+  renderCourseSelect();
+  renderHoleChips();
+  renderReadout();
+  renderPois();
+  startGps();
+})();
+</script>
+</body>
+</html>
