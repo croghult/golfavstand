@@ -222,6 +222,41 @@
     padding:4px 10px;border-radius:99px;
     border:1px solid var(--line);background:var(--card);color:var(--muted);
   }
+  /* Hålbilder */
+  .hole-img-wrap{
+    margin:0 16px 0;
+    border-radius:var(--radius) var(--radius) 0 0;
+    overflow:hidden;position:relative;
+    background:#111;
+  }
+  .hole-img-wrap img{
+    width:100%;max-height:200px;
+    object-fit:cover;display:block;
+  }
+  .hole-img-actions{
+    position:absolute;top:8px;right:8px;
+    display:flex;gap:6px;
+  }
+  .hole-img-btn{
+    background:rgba(22,35,27,.6);color:#fff;
+    border:none;border-radius:99px;
+    padding:6px 12px;font-size:13px;font-weight:600;
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  }
+  .img-placeholder{
+    margin:0 16px 0;
+    padding:11px 16px;
+    border:1.5px dashed var(--line);
+    border-radius:var(--radius);
+    text-align:center;
+    font-size:13px;font-weight:600;color:var(--muted);
+    background:var(--card);cursor:pointer;
+  }
+  .readout.with-img{
+    border-radius:0 0 var(--radius) var(--radius);
+    border-top:none;margin-top:0;
+  }
+  .img-uploading{opacity:.5;pointer-events:none}
   .status-tag{
     display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;
     text-transform:uppercase;padding:3px 8px;border-radius:6px;
@@ -250,7 +285,9 @@
 </div>
 
 <div class="holes" id="holeChips"></div>
+<div id="holeImgSection"></div>
 <div class="readout" id="readout"></div>
+<input type="file" id="imageInput" accept="image/*" style="display:none">
 
 <div class="poi-section">
   <h2>Egna markeringar – hål <span id="poiHoleNum">1</span></h2>
@@ -388,6 +425,9 @@ import {
   initializeFirestore, persistentLocalCache,
   doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+import {
+  getStorage, ref, uploadBytes, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js";
 
 /* ---- Firebase init ---- */
 const firebaseConfig = {
@@ -399,10 +439,11 @@ const firebaseConfig = {
   appId: "1:672584724048:web:525fffedaab9009c092b55",
   measurementId: "G-67HB3VHPS4"
 };
-const app = initializeApp(firebaseConfig);
+const app     = initializeApp(firebaseConfig);
 getAnalytics(app);
-const auth = getAuth(app);
-const db   = initializeFirestore(app, { localCache: persistentLocalCache() });
+const auth    = getAuth(app);
+const db      = initializeFirestore(app, { localCache: persistentLocalCache() });
+const storage = getStorage(app);
 
 /* ================================================================
    BANDATA – hårdkodad grunddata
@@ -438,6 +479,7 @@ let editingPoi    = null;
 let currentUid    = null;
 let gpsStarted    = false;
 let deleteCourseConfirmed = false;
+let holeImages = {}; // { courseId: { holeNum: url } }
 
 /* ---- Hjälpfunktioner ---- */
 function haversine(a, b) {
@@ -547,6 +589,90 @@ async function removeCourse(courseId) {
   BASE_COURSES.forEach(c => allMap.set(c.id, c));
   firestoreCourses.forEach(c => allMap.set(c.id, c));
   COURSES = Array.from(allMap.values());
+}
+
+/* ---- Bilder: lagring ---- */
+async function loadImages() {
+  if (!currentUid) return;
+  try {
+    const snap = await getDoc(doc(db, "users", currentUid));
+    const data = snap.exists() ? snap.data() : {};
+    holeImages = data.images ? JSON.parse(data.images) : {};
+  } catch (e) { holeImages = {}; }
+}
+async function saveImages() {
+  if (!currentUid) return;
+  try { await setDoc(doc(db, "users", currentUid), { images: JSON.stringify(holeImages) }, { merge: true }); }
+  catch (e) { console.error("Kunde inte spara bilddata:", e); }
+}
+
+function resizeImage(file, maxPx = 1400) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      canvas.toBlob(resolve, "image/jpeg", 0.82);
+    };
+    img.src = url;
+  });
+}
+
+async function uploadHoleImage(file) {
+  const section = document.getElementById("holeImgSection");
+  section.classList.add("img-uploading");
+  try {
+    const blob    = await resizeImage(file);
+    const path    = `users/${currentUid}/${currentCourse.id}/${currentHole}.jpg`;
+    const imgRef  = ref(storage, path);
+    await uploadBytes(imgRef, blob, { contentType: "image/jpeg" });
+    const url = await getDownloadURL(imgRef);
+    if (!holeImages[currentCourse.id]) holeImages[currentCourse.id] = {};
+    holeImages[currentCourse.id][currentHole] = url;
+    await saveImages();
+    renderHoleImage();
+  } catch (e) { console.error("Uppladdning misslyckades:", e); }
+  finally { section.classList.remove("img-uploading"); }
+}
+
+async function deleteHoleImage() {
+  try {
+    const path = `users/${currentUid}/${currentCourse.id}/${currentHole}.jpg`;
+    await deleteObject(ref(storage, path));
+  } catch (e) { /* redan borta */ }
+  if (holeImages[currentCourse.id]) delete holeImages[currentCourse.id][currentHole];
+  await saveImages();
+  renderHoleImage();
+}
+
+function renderHoleImage() {
+  const section = document.getElementById("holeImgSection");
+  const readout = document.getElementById("readout");
+  const url = holeImages[currentCourse.id] && holeImages[currentCourse.id][currentHole];
+  readout.classList.toggle("with-img", !!url);
+  if (url) {
+    section.innerHTML = `
+      <div class="hole-img-wrap">
+        <img src="${esc(url)}" alt="Hålbild hål ${currentHole}">
+        <div class="hole-img-actions">
+          <button class="hole-img-btn" id="changeImgBtn">Byt bild</button>
+          <button class="hole-img-btn" id="removeImgBtn">✕</button>
+        </div>
+      </div>`;
+    document.getElementById("changeImgBtn").addEventListener("click", () =>
+      document.getElementById("imageInput").click());
+    document.getElementById("removeImgBtn").addEventListener("click", deleteHoleImage);
+  } else {
+    section.innerHTML = `<div class="img-placeholder" id="addImgBtn">📷 Lägg till hålbild</div>`;
+    document.getElementById("addImgBtn").addEventListener("click", () =>
+      document.getElementById("imageInput").click());
+  }
 }
 
 /* ---- Firestore: användardata ---- */
@@ -672,6 +798,7 @@ function renderReadout() {
       { enableHighAccuracy: true, timeout: 10000 }
     );
   });
+  renderHoleImage();
 }
 
 function renderPois() {
@@ -1032,13 +1159,19 @@ document.getElementById("googleBtn").addEventListener("click", async () => {
 });
 document.getElementById("signOutBtn").addEventListener("click", () => signOut(auth));
 
+document.getElementById("imageInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (file) uploadHoleImage(file);
+  e.target.value = "";
+});
+
 /* ---- Auth-tillstånd ---- */
 onAuthStateChanged(auth, async user => {
   if (user) {
     currentUid = user.uid;
     document.getElementById("authOverlay").classList.remove("open");
     document.getElementById("signOutBtn").style.display = "";
-    await Promise.all([loadCourses(), loadStored()]);
+    await Promise.all([loadCourses(), loadStored(), loadImages()]);
     currentCourse = COURSES[0];
     currentHole   = currentCourse.holes[0].hole;
     renderCourseSelect();
@@ -1048,7 +1181,7 @@ onAuthStateChanged(auth, async user => {
     startGps();
   } else {
     currentUid = null;
-    pois = {}; greenEdits = {}; position = null;
+    pois = {}; greenEdits = {}; holeImages = {}; position = null;
     firestoreCourses = []; COURSES = [...BASE_COURSES];
     document.getElementById("authOverlay").classList.add("open");
     document.getElementById("signOutBtn").style.display = "none";
