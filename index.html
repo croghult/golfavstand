@@ -491,6 +491,7 @@ function renderReadout() {
       <div class="nopos">Väntar på GPS-position …<br>
         Tillåt platsåtkomst när webbläsaren frågar.
         <br><button id="testPosBtn">Använd testposition</button>
+        <br><button id="reqGpsBtn">Aktivera platstjänster</button>
       </div>`;
   } else {
     const dF = fmt(haversine(position, h.green.front));
@@ -510,6 +511,18 @@ function renderReadout() {
   if (tBtn) tBtn.addEventListener("click", () => {
     const g = currentCourse.holes[0].green.middle;
     setPosition({ lat: g.lat - 0.0014, lng: g.lng - 0.0009, accuracy: 5, test: true });
+  });
+  const rBtn = document.getElementById("reqGpsBtn");
+  if (rBtn) rBtn.addEventListener("click", () => {
+    navigator.geolocation.getCurrentPosition(
+      p => setPosition({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+      err => {
+        const s = document.getElementById("gpsStatus");
+        s.textContent = "Blockerad";
+        s.className = "gps bad";
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   });
 }
 
