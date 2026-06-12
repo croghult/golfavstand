@@ -1564,8 +1564,11 @@ onAuthStateChanged(auth, async user => {
 });
 </script>
 <script>
+// Avregistrera gamla service workers så de inte stör
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/golfavstand/sw.js');
+  navigator.serviceWorker.getRegistrations().then(regs =>
+    regs.forEach(r => r.unregister())
+  );
 }
 </script>
 </body>
