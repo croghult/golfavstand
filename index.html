@@ -327,18 +327,7 @@
       </svg>
       Fortsätt med Google
     </button>
-    <div class="auth-divider">eller</div>
-    <label for="authEmail">E-post</label>
-    <input id="authEmail" type="email" placeholder="din@epost.se" autocomplete="email">
-    <label for="authPassword">Lösenord</label>
-    <input id="authPassword" type="password" placeholder="••••••••" autocomplete="current-password">
     <div class="err" id="authErr"></div>
-    <div class="actions">
-      <button class="btn-save" id="authSubmit">Logga in</button>
-    </div>
-    <p style="text-align:center;margin-top:16px;font-size:14px;color:var(--muted)">
-      Inget konto?&nbsp;<button class="inline-btn" id="authToggle" style="margin-top:0">Skapa konto</button>
-    </p>
   </div>
 </div>
 
@@ -349,7 +338,6 @@ import { getAnalytics }
   from "https://www.gstatic.com/firebasejs/12.14.0/firebase-analytics.js";
 import {
   getAuth, onAuthStateChanged,
-  signInWithEmailAndPassword, createUserWithEmailAndPassword,
   signInWithPopup, GoogleAuthProvider, signOut
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
@@ -787,42 +775,6 @@ document.getElementById("copyCode").addEventListener("click", copyCode);
 greenOverlay.addEventListener("click", e => { if (e.target === greenOverlay) closeGreenSheet(); });
 
 /* ---- Auth UI ---- */
-let authMode = "signin"; // "signin" | "signup"
-
-document.getElementById("authToggle").addEventListener("click", () => {
-  authMode = authMode === "signin" ? "signup" : "signin";
-  const isSignup = authMode === "signup";
-  document.getElementById("authTitle").textContent   = isSignup ? "Skapa konto" : "Logga in";
-  document.getElementById("authSubmit").textContent  = isSignup ? "Skapa konto" : "Logga in";
-  document.getElementById("authToggle").textContent  = isSignup ? "Logga in istället" : "Skapa konto";
-  document.getElementById("authErr").classList.remove("show");
-});
-
-document.getElementById("authSubmit").addEventListener("click", async () => {
-  const email    = document.getElementById("authEmail").value.trim();
-  const password = document.getElementById("authPassword").value;
-  const errEl    = document.getElementById("authErr");
-  errEl.classList.remove("show");
-  if (!email || !password) {
-    errEl.textContent = "Fyll i e-post och lösenord.";
-    errEl.classList.add("show"); return;
-  }
-  try {
-    if (authMode === "signup") {
-      await createUserWithEmailAndPassword(auth, email, password);
-    } else {
-      await signInWithEmailAndPassword(auth, email, password);
-    }
-  } catch (e) {
-    errEl.textContent = authErrorMessage(e.code);
-    errEl.classList.add("show");
-  }
-});
-
-document.getElementById("authPassword").addEventListener("keydown", e => {
-  if (e.key === "Enter") document.getElementById("authSubmit").click();
-});
-
 document.getElementById("googleBtn").addEventListener("click", async () => {
   const errEl = document.getElementById("authErr");
   errEl.classList.remove("show");
