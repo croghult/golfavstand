@@ -226,23 +226,26 @@
     padding:4px 10px;border-radius:99px;
     border:1px solid var(--line);background:var(--card);color:var(--muted);
   }
-  /* Hålbild – helbakgrund */
-  #holeBgImg{
-    position:fixed;inset:0;z-index:0;
-    background-size:cover;background-position:center;background-repeat:no-repeat;
-    pointer-events:none;display:none;
+  /* Hålbild – helbakgrund via body */
+  body{
+    background-size:cover;
+    background-position:center;
+    background-attachment:fixed;
   }
-  #holeBgImg::after{
-    content:"";position:absolute;inset:0;
-    background:rgba(247,248,244,.72);
-  }
-  body.has-bg-img{background:transparent}
   .img-camera-btn{
     font-size:17px;background:none;border:none;
     padding:3px 6px;opacity:.45;line-height:1;
   }
   .img-camera-btn.has-img{opacity:1}
-  .img-uploading .img-camera-btn{opacity:.3;pointer-events:none}
+  /* Spinner */
+  .spinner{
+    width:16px;height:16px;
+    border:2px solid var(--line);
+    border-top-color:var(--green);
+    border-radius:50%;
+    animation:spin .65s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
   /* Kompass */
   .compass-btn{
     position:absolute;top:10px;left:10px;
@@ -282,6 +285,7 @@
 <header>
   <h1>Golfavstånd</h1>
   <div class="header-right">
+    <span id="loadingSpinner" style="display:none" class="spinner"></span>
     <button class="img-camera-btn" id="imgCameraBtn" style="display:none" title="Hålbild" aria-label="Hantera hålbild">📷</button>
     <button class="sign-out-btn" id="signOutBtn" style="display:none">Logga ut</button>
     <span class="gps bad" id="gpsStatus">Ingen GPS</span>
@@ -595,6 +599,7 @@ function readCoord(latInput, lngInput) {
 /* ---- Firestore: bandata ---- */
 async function loadCourses() {
   if (!currentUid) return;
+  setLoading(true);
   try {
     const [sharedSnap, ownSnap] = await Promise.all([
       getDocs(query(collection(db, "courses"), where("shared", "==", true))),
@@ -610,10 +615,11 @@ async function loadCourses() {
     COURSES = Array.from(allMap.values());
   } catch (e) {
     console.error("Kunde inte ladda banor:", e);
-  }
+  } finally { setLoading(false); }
 }
 
 async function createCourse(name, holeCount, shared) {
+  setLoading(true);
   const courseRef = doc(collection(db, "courses"));
   const id = courseRef.id;
   const holes = Array.from({length: holeCount}, (_, i) => ({
@@ -627,27 +633,34 @@ async function createCourse(name, holeCount, shared) {
   BASE_COURSES.forEach(c => allMap.set(c.id, c));
   firestoreCourses.forEach(c => allMap.set(c.id, c));
   COURSES = Array.from(allMap.values());
+  setLoading(false);
   return courseData;
 }
 
 async function updateCourseGreen(courseId, holeNum, greenCoords) {
+  setLoading(true);
   const fc = getFirestoreCourse(courseId);
   if (!fc) return;
   const fh = fc.holes.find(h => h.hole === holeNum);
   if (fh) fh.green = greenCoords;
   await updateDoc(doc(db, "courses", courseId), { holes: fc.holes });
+  setLoading(false);
 }
 
 async function toggleCourseSharing(courseId) {
+  setLoading(true);
   const fc = getFirestoreCourse(courseId);
-  if (!fc) return;
+  if (!fc) { setLoading(false); return; }
   fc.shared = !fc.shared;
   await updateDoc(doc(db, "courses", courseId), { shared: fc.shared });
+  setLoading(false);
 }
 
 async function removeCourse(courseId) {
+  setLoading(true);
   await deleteDoc(doc(db, "courses", courseId));
   firestoreCourses = firestoreCourses.filter(c => c.id !== courseId);
+  setLoading(false);
   const allMap = new Map();
   BASE_COURSES.forEach(c => allMap.set(c.id, c));
   firestoreCourses.forEach(c => allMap.set(c.id, c));
@@ -688,8 +701,7 @@ function resizeImage(file, maxPx = 1400) {
 }
 
 async function uploadHoleImage(file) {
-  document.getElementById("imgCameraBtn").style.opacity = ".3";
-  document.getElementById("imgCameraBtn").style.pointerEvents = "none";
+  setLoading(true);
   try {
     const blob    = await resizeImage(file);
     const path    = `users/${currentUid}/${currentCourse.id}/${currentHole}.jpg`;
@@ -701,37 +713,39 @@ async function uploadHoleImage(file) {
     await saveImages();
     renderHoleImage();
   } catch (e) { console.error("Uppladdning misslyckades:", e); }
-  finally {
-    const btn = document.getElementById("imgCameraBtn");
-    btn.style.opacity = ""; btn.style.pointerEvents = "";
-  }
+  finally { setLoading(false); }
 }
 
 async function deleteHoleImage() {
+  setLoading(true);
   try {
     const path = `users/${currentUid}/${currentCourse.id}/${currentHole}.jpg`;
     await deleteObject(ref(storage, path));
   } catch (e) { /* redan borta */ }
   if (holeImages[currentCourse.id]) delete holeImages[currentCourse.id][currentHole];
   await saveImages();
+  setLoading(false);
   renderHoleImage();
 }
 
 function renderHoleImage() {
-  const bg  = document.getElementById("holeBgImg");
   const url = holeImages[currentCourse.id] && holeImages[currentCourse.id][currentHole];
   const btn = document.getElementById("imgCameraBtn");
   if (url) {
-    bg.style.backgroundImage = `url("${url}")`;
-    bg.style.display = "";
-    document.body.classList.add("has-bg-img");
+    document.body.style.backgroundImage =
+      `linear-gradient(rgba(247,248,244,.74),rgba(247,248,244,.74)),url("${url}")`;
     if (btn) btn.classList.add("has-img");
   } else {
-    bg.style.backgroundImage = "";
-    bg.style.display = "none";
-    document.body.classList.remove("has-bg-img");
+    document.body.style.backgroundImage = "";
     if (btn) btn.classList.remove("has-img");
   }
+}
+
+let _loadingCount = 0;
+function setLoading(on) {
+  _loadingCount = Math.max(0, _loadingCount + (on ? 1 : -1));
+  document.getElementById("loadingSpinner").style.display =
+    _loadingCount > 0 ? "" : "none";
 }
 
 /* ---- Firestore: användardata ---- */
