@@ -22,8 +22,7 @@
   html,body{height:100%}
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    background:var(--bg);
-    color:var(--ink);
+    background:var(--bg);color:var(--ink);
     -webkit-font-smoothing:antialiased;
     padding-bottom:96px;
   }
@@ -44,8 +43,9 @@
   .gps.bad{color:var(--red);border-color:#E3BBAE}
 
   .course-row{padding:6px 16px 2px}
+  .course-row-inner{display:flex;gap:8px;align-items:center}
   select#courseSelect{
-    width:100%;
+    flex:1;
     font-size:17px;font-weight:600;color:var(--ink);
     padding:10px 12px;border-radius:var(--radius);
     border:1px solid var(--line);background:var(--card);
@@ -53,6 +53,13 @@
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7A6F' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
     background-repeat:no-repeat;background-position:right 14px center;
   }
+  .icon-btn{
+    flex:0 0 auto;width:44px;height:44px;border-radius:50%;
+    border:1px solid var(--line);background:var(--card);
+    font-size:20px;color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .icon-btn.active{background:var(--green);border-color:var(--green);color:#fff}
 
   .holes{
     display:flex;gap:8px;overflow-x:auto;
@@ -70,13 +77,10 @@
 
   .readout{
     margin:6px 16px 14px;
-    background:var(--card);
-    border:1px solid var(--line);
+    background:var(--card);border:1px solid var(--line);
     border-radius:var(--radius);
     padding:22px 18px 18px;
-    text-align:center;
-    position:relative;
-    overflow:hidden;
+    text-align:center;position:relative;overflow:hidden;
   }
   .readout::after{
     content:"";position:absolute;top:0;left:50%;
@@ -94,8 +98,7 @@
   }
   .readout .mid{
     font-size:88px;font-weight:800;line-height:1;
-    font-variant-numeric:tabular-nums;
-    letter-spacing:-0.02em;
+    font-variant-numeric:tabular-nums;letter-spacing:-0.02em;
     margin:4px 0 2px;
   }
   .readout .mid small{font-size:24px;font-weight:600;color:var(--muted);margin-left:4px}
@@ -168,7 +171,6 @@
   }
   .sheet input.invalid{border-color:var(--red)}
   .coord-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .coord-grid .full{grid-column:1 / -1}
   .group-label{
     font-size:12px;font-weight:700;letter-spacing:.08em;
     text-transform:uppercase;color:var(--green-dark);
@@ -187,8 +189,12 @@
   .sheet .actions button{
     flex:1;padding:13px;font-size:16px;font-weight:700;border-radius:10px;border:none;
   }
+  .actions.col{flex-direction:column}
+  .actions.col button{width:100%}
   .btn-cancel{background:var(--bg);color:var(--ink);border:1px solid var(--line) !important}
   .btn-save{background:var(--green);color:#fff}
+  .btn-save-dark{background:var(--green-dark);color:#fff}
+  .btn-danger{background:var(--bg);color:var(--red);border:1px solid var(--red) !important}
   .code-view{display:none}
   .code-view.open{display:block}
   .code-view textarea{
@@ -214,9 +220,15 @@
   .sign-out-btn{
     font-size:12px;font-weight:600;
     padding:4px 10px;border-radius:99px;
-    border:1px solid var(--line);background:var(--card);
-    color:var(--muted);
+    border:1px solid var(--line);background:var(--card);color:var(--muted);
   }
+  .status-tag{
+    display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;
+    text-transform:uppercase;padding:3px 8px;border-radius:6px;
+    margin-bottom:14px;
+  }
+  .status-tag.private{background:#F0F4F1;color:var(--muted)}
+  .status-tag.shared{background:#E6F2EC;color:var(--green-dark)}
 </style>
 </head>
 <body>
@@ -230,11 +242,14 @@
 </header>
 
 <div class="course-row">
-  <select id="courseSelect"></select>
+  <div class="course-row-inner">
+    <select id="courseSelect"></select>
+    <button class="icon-btn" id="newCourseBtn" title="Ny bana" aria-label="Ny bana">+</button>
+    <button class="icon-btn" id="manageCourseBtn" title="Hantera bana" aria-label="Hantera bana" style="display:none">⚙</button>
+  </div>
 </div>
 
 <div class="holes" id="holeChips"></div>
-
 <div class="readout" id="readout"></div>
 
 <div class="poi-section">
@@ -246,7 +261,7 @@
   <button id="addPoiBtn">Lägg till markering</button>
 </div>
 
-<!-- Sheet: markering (ny/redigera) -->
+<!-- Sheet: markering -->
 <div class="overlay" id="poiOverlay">
   <div class="sheet">
     <h3 id="poiSheetTitle">Ny markering</h3>
@@ -255,16 +270,10 @@
     <label for="poiHoleSelect">Hör till hål</label>
     <select id="poiHoleSelect"></select>
     <div class="coord-grid">
-      <div>
-        <label for="poiLat">Latitud</label>
-        <input id="poiLat" type="text" inputmode="decimal" placeholder="59.301234">
-      </div>
-      <div>
-        <label for="poiLng">Longitud</label>
-        <input id="poiLng" type="text" inputmode="decimal" placeholder="18.102345">
-      </div>
+      <div><label for="poiLat">Latitud</label><input id="poiLat" type="text" inputmode="decimal" placeholder="59.301234"></div>
+      <div><label for="poiLng">Longitud</label><input id="poiLng" type="text" inputmode="decimal" placeholder="18.102345"></div>
     </div>
-    <div class="hint">Tips: klistra in hela paret från Google Maps (t.ex. "59.301234, 18.102345") i latitud-fältet så delas det upp automatiskt.</div>
+    <div class="hint">Tips: klistra in hela paret från Google Maps i latitud-fältet så delas det upp automatiskt.</div>
     <button class="inline-btn" id="useGpsBtn">Använd min position</button>
     <div class="err" id="poiErr"></div>
     <div class="actions">
@@ -304,7 +313,7 @@
     </div>
     <div class="code-view" id="codeView">
       <h3>Banans data som kod</h3>
-      <div class="hint" style="margin:0 0 10px">Inklusive dina sparade ändringar. Klistra in i COURSES-listan i HTML-filen om du vill göra koden till permanent grunddata. Egna markeringar ingår inte – de ligger kvar i appens lagring.</div>
+      <div class="hint" style="margin:0 0 10px">Inklusive dina sparade ändringar. Klistra in i COURSES-listan i HTML-filen om du vill göra koden till permanent grunddata.</div>
       <textarea id="codeArea" readonly></textarea>
       <div class="actions">
         <button class="btn-cancel" id="backFromCode">Tillbaka</button>
@@ -314,10 +323,45 @@
   </div>
 </div>
 
+<!-- Sheet: ny bana -->
+<div class="overlay" id="newCourseOverlay">
+  <div class="sheet">
+    <h3>Ny bana</h3>
+    <label for="newCourseName">Banans namn</label>
+    <input id="newCourseName" type="text" placeholder="T.ex. Bro Hof Slott GC" autocomplete="off">
+    <label for="newCourseHoles">Antal hål</label>
+    <select id="newCourseHoles">
+      <option value="9">9 hål</option>
+      <option value="18" selected>18 hål</option>
+    </select>
+    <div class="err" id="newCourseErr"></div>
+    <div class="actions col" style="margin-top:18px">
+      <button class="btn-save" id="savePrivateCourse">Spara som min bana</button>
+      <button class="btn-save-dark" id="saveSharedCourse">Dela banan med alla</button>
+      <button class="btn-cancel" id="cancelNewCourse">Avbryt</button>
+    </div>
+    <div class="hint" style="margin-top:12px">Greenkoordinater för varje hål läggs till via "Redigera"-knappen när banan är skapad.</div>
+  </div>
+</div>
+
+<!-- Sheet: hantera bana -->
+<div class="overlay" id="manageCourseOverlay">
+  <div class="sheet">
+    <h3 id="manageCourseTitle">Hantera bana</h3>
+    <span class="status-tag" id="manageCourseTag"></span>
+    <p id="manageCourseDesc" style="font-size:14px;color:var(--muted);margin-bottom:4px"></p>
+    <div class="actions col">
+      <button class="btn-save" id="toggleShareBtn"></button>
+      <button class="btn-danger" id="deleteCourseBtn">Ta bort bana</button>
+      <button class="btn-cancel" id="cancelManageCourse">Stäng</button>
+    </div>
+  </div>
+</div>
+
 <!-- Auth overlay -->
 <div class="overlay auth-overlay open" id="authOverlay">
   <div class="sheet">
-    <h3 id="authTitle">Logga in</h3>
+    <h3>Logga in</h3>
     <button class="google-btn" id="googleBtn">
       <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908C16.658 14.013 17.64 11.706 17.64 9.2z" fill="#4285F4"/>
@@ -342,7 +386,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache,
-  doc, getDoc, setDoc
+  doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 /* ---- Firebase init ---- */
@@ -358,30 +402,33 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 getAnalytics(app);
 const auth = getAuth(app);
-const db  = initializeFirestore(app, { localCache: persistentLocalCache() });
+const db   = initializeFirestore(app, { localCache: persistentLocalCache() });
 
 /* ================================================================
-   BANDATA
+   BANDATA – hårdkodad grunddata
    ================================================================ */
-const COURSES = [
+const BASE_COURSES = [
   {
     id: "KDRGK",
     name: "Kungliga Drottningholms GK",
     holes: [
-      { hole: 1, green: { front:{lat:59.315700,lng:17.859220}, middle:{lat:59.315384,lng:17.859145}, back:{lat:59.315214,lng:17.859432} } },
-      { hole: 2, green: { front:{lat:59.30340,lng:18.10400}, middle:{lat:59.30351,lng:18.10400}, back:{lat:59.30362,lng:18.10400} } },
-      { hole: 3, green: { front:{lat:59.30560,lng:18.10120}, middle:{lat:59.30571,lng:18.10120}, back:{lat:59.30582,lng:18.10120} } },
-      { hole: 4, green: { front:{lat:59.30790,lng:18.09800}, middle:{lat:59.30801,lng:18.09800}, back:{lat:59.30812,lng:18.09800} } },
-      { hole: 5, green: { front:{lat:59.30990,lng:18.10250}, middle:{lat:59.31001,lng:18.10250}, back:{lat:59.31012,lng:18.10250} } },
-      { hole: 6, green: { front:{lat:59.30770,lng:18.10700}, middle:{lat:59.30781,lng:18.10700}, back:{lat:59.30792,lng:18.10700} } },
-      { hole: 7, green: { front:{lat:59.30540,lng:18.10950}, middle:{lat:59.30551,lng:18.10950}, back:{lat:59.30562,lng:18.10950} } },
-      { hole: 8, green: { front:{lat:59.30310,lng:18.10780}, middle:{lat:59.30321,lng:18.10780}, back:{lat:59.30332,lng:18.10780} } },
-      { hole: 9, green: { front:{lat:59.30120,lng:18.10380}, middle:{lat:59.30131,lng:18.10380}, back:{lat:59.30142,lng:18.10380} } }
+      { hole: 1,  green: { front:{lat:59.315700,lng:17.859220}, middle:{lat:59.315384,lng:17.859145}, back:{lat:59.315214,lng:17.859432} } },
+      { hole: 2,  green: { front:{lat:59.30340,lng:18.10400},  middle:{lat:59.30351,lng:18.10400},  back:{lat:59.30362,lng:18.10400}  } },
+      { hole: 3,  green: { front:{lat:59.30560,lng:18.10120},  middle:{lat:59.30571,lng:18.10120},  back:{lat:59.30582,lng:18.10120}  } },
+      { hole: 4,  green: { front:{lat:59.30790,lng:18.09800},  middle:{lat:59.30801,lng:18.09800},  back:{lat:59.30812,lng:18.09800}  } },
+      { hole: 5,  green: { front:{lat:59.30990,lng:18.10250},  middle:{lat:59.31001,lng:18.10250},  back:{lat:59.31012,lng:18.10250}  } },
+      { hole: 6,  green: { front:{lat:59.30770,lng:18.10700},  middle:{lat:59.30781,lng:18.10700},  back:{lat:59.30792,lng:18.10700}  } },
+      { hole: 7,  green: { front:{lat:59.30540,lng:18.10950},  middle:{lat:59.30551,lng:18.10950},  back:{lat:59.30562,lng:18.10950}  } },
+      { hole: 8,  green: { front:{lat:59.30310,lng:18.10780},  middle:{lat:59.30321,lng:18.10780},  back:{lat:59.30332,lng:18.10780}  } },
+      { hole: 9,  green: { front:{lat:59.30120,lng:18.10380},  middle:{lat:59.30131,lng:18.10380},  back:{lat:59.30142,lng:18.10380}  } }
     ]
   }
 ];
 
 /* ---- Tillstånd ---- */
+let firestoreCourses = [];
+let COURSES = [...BASE_COURSES];
+
 let currentCourse = COURSES[0];
 let currentHole   = currentCourse.holes[0].hole;
 let position      = null;
@@ -390,6 +437,7 @@ let greenEdits    = {};
 let editingPoi    = null;
 let currentUid    = null;
 let gpsStarted    = false;
+let deleteCourseConfirmed = false;
 
 /* ---- Hjälpfunktioner ---- */
 function haversine(a, b) {
@@ -410,10 +458,17 @@ function holeData() {
 function greenFor(courseId, hole) {
   const base = COURSES.find(c => c.id === courseId).holes.find(h => h.hole === hole);
   const edit = greenEdits[courseId] && greenEdits[courseId][hole];
-  return edit || base.green;
+  const g = edit || base.green;
+  return g;
 }
 function holePois() {
   return (pois[currentCourse.id] && pois[currentCourse.id][currentHole]) || [];
+}
+function isOwnFirestoreCourse(courseId) {
+  return firestoreCourses.some(c => c.id === courseId && c.ownerId === currentUid);
+}
+function getFirestoreCourse(courseId) {
+  return firestoreCourses.find(c => c.id === courseId);
 }
 
 function attachPairSplit(latInput, lngInput) {
@@ -422,7 +477,6 @@ function attachPairSplit(latInput, lngInput) {
     if (m) { latInput.value = m[1]; lngInput.value = m[2]; }
   });
 }
-
 function readCoord(latInput, lngInput) {
   const lat = parseFloat(latInput.value.replace(",", "."));
   const lng = parseFloat(lngInput.value.replace(",", "."));
@@ -433,7 +487,69 @@ function readCoord(latInput, lngInput) {
   return ok ? { lat, lng } : null;
 }
 
-/* ---- Firestore-lagring ---- */
+/* ---- Firestore: bandata ---- */
+async function loadCourses() {
+  if (!currentUid) return;
+  try {
+    const [sharedSnap, ownSnap] = await Promise.all([
+      getDocs(query(collection(db, "courses"), where("shared", "==", true))),
+      getDocs(query(collection(db, "courses"), where("ownerId", "==", currentUid)))
+    ]);
+    const map = new Map();
+    sharedSnap.docs.forEach(d => map.set(d.id, d.data()));
+    ownSnap.docs.forEach(d => map.set(d.id, d.data()));
+    firestoreCourses = Array.from(map.values());
+    const allMap = new Map();
+    BASE_COURSES.forEach(c => allMap.set(c.id, c));
+    firestoreCourses.forEach(c => allMap.set(c.id, c));
+    COURSES = Array.from(allMap.values());
+  } catch (e) {
+    console.error("Kunde inte ladda banor:", e);
+  }
+}
+
+async function createCourse(name, holeCount, shared) {
+  const courseRef = doc(collection(db, "courses"));
+  const id = courseRef.id;
+  const holes = Array.from({length: holeCount}, (_, i) => ({
+    hole: i + 1,
+    green: { front: null, middle: null, back: null }
+  }));
+  const courseData = { id, name, holes, shared, ownerId: currentUid, createdAt: new Date().toISOString() };
+  await setDoc(courseRef, courseData);
+  firestoreCourses.push(courseData);
+  const allMap = new Map();
+  BASE_COURSES.forEach(c => allMap.set(c.id, c));
+  firestoreCourses.forEach(c => allMap.set(c.id, c));
+  COURSES = Array.from(allMap.values());
+  return courseData;
+}
+
+async function updateCourseGreen(courseId, holeNum, greenCoords) {
+  const fc = getFirestoreCourse(courseId);
+  if (!fc) return;
+  const fh = fc.holes.find(h => h.hole === holeNum);
+  if (fh) fh.green = greenCoords;
+  await updateDoc(doc(db, "courses", courseId), { holes: fc.holes });
+}
+
+async function toggleCourseSharing(courseId) {
+  const fc = getFirestoreCourse(courseId);
+  if (!fc) return;
+  fc.shared = !fc.shared;
+  await updateDoc(doc(db, "courses", courseId), { shared: fc.shared });
+}
+
+async function removeCourse(courseId) {
+  await deleteDoc(doc(db, "courses", courseId));
+  firestoreCourses = firestoreCourses.filter(c => c.id !== courseId);
+  const allMap = new Map();
+  BASE_COURSES.forEach(c => allMap.set(c.id, c));
+  firestoreCourses.forEach(c => allMap.set(c.id, c));
+  COURSES = Array.from(allMap.values());
+}
+
+/* ---- Firestore: användardata ---- */
 async function loadStored() {
   if (!currentUid) return;
   try {
@@ -441,31 +557,54 @@ async function loadStored() {
     const data = snap.exists() ? snap.data() : {};
     pois       = data.pois   ? JSON.parse(data.pois)   : {};
     greenEdits = data.greens ? JSON.parse(data.greens) : {};
-  } catch (e) {
-    pois = {}; greenEdits = {};
-  }
+  } catch (e) { pois = {}; greenEdits = {}; }
 }
-
 async function savePois() {
   if (!currentUid) return;
-  try {
-    await setDoc(doc(db, "users", currentUid), { pois: JSON.stringify(pois) }, { merge: true });
-  } catch (e) { console.error("Kunde inte spara markeringar:", e); }
+  try { await setDoc(doc(db, "users", currentUid), { pois: JSON.stringify(pois) }, { merge: true }); }
+  catch (e) { console.error("Kunde inte spara markeringar:", e); }
 }
-
 async function saveGreenEdits() {
   if (!currentUid) return;
-  try {
-    await setDoc(doc(db, "users", currentUid), { greens: JSON.stringify(greenEdits) }, { merge: true });
-  } catch (e) { console.error("Kunde inte spara greendata:", e); }
+  try { await setDoc(doc(db, "users", currentUid), { greens: JSON.stringify(greenEdits) }, { merge: true }); }
+  catch (e) { console.error("Kunde inte spara greendata:", e); }
 }
 
 /* ---- Rendering ---- */
 function renderCourseSelect() {
   const sel = document.getElementById("courseSelect");
-  sel.innerHTML = COURSES.map(c =>
-    `<option value="${c.id}"${c.id===currentCourse.id?" selected":""}>${esc(c.name)}</option>`
-  ).join("");
+  const ownCourses     = firestoreCourses.filter(c => c.ownerId === currentUid);
+  const othersShared   = firestoreCourses.filter(c => c.ownerId !== currentUid);
+
+  let html = "";
+  if (BASE_COURSES.length) {
+    html += `<optgroup label="Banor">`;
+    html += BASE_COURSES.map(c =>
+      `<option value="${c.id}"${c.id===currentCourse.id?" selected":""}>${esc(c.name)}</option>`
+    ).join("");
+    html += `</optgroup>`;
+  }
+  if (ownCourses.length) {
+    html += `<optgroup label="Mina banor">`;
+    html += ownCourses.map(c =>
+      `<option value="${c.id}"${c.id===currentCourse.id?" selected":""}>${esc(c.name)}${c.shared?" (delad)":""}</option>`
+    ).join("");
+    html += `</optgroup>`;
+  }
+  if (othersShared.length) {
+    html += `<optgroup label="Delade banor">`;
+    html += othersShared.map(c =>
+      `<option value="${c.id}"${c.id===currentCourse.id?" selected":""}>${esc(c.name)}</option>`
+    ).join("");
+    html += `</optgroup>`;
+  }
+  sel.innerHTML = html;
+  updateManageBtn();
+}
+
+function updateManageBtn() {
+  document.getElementById("manageCourseBtn").style.display =
+    isOwnFirestoreCourse(currentCourse.id) ? "" : "none";
 }
 
 function renderHoleChips() {
@@ -483,9 +622,17 @@ function renderHoleChips() {
 
 function renderReadout() {
   const el = document.getElementById("readout");
-  const h = holeData();
+  const h  = holeData();
+  const g  = h.green;
+  const hasCoords = g && g.front && g.middle && g.back;
+
   let inner = `<button class="edit-green" id="editGreenBtn">Redigera</button>`;
-  if (!position) {
+
+  if (!hasCoords) {
+    inner += `
+      <div class="label">Hål ${currentHole}</div>
+      <div class="nopos">Inga greenkoordinater ännu.<br>Tryck på Redigera för att lägga till.</div>`;
+  } else if (!position) {
     inner += `
       <div class="label">Hål ${currentHole}</div>
       <div class="nopos">Väntar på GPS-position …<br>
@@ -494,9 +641,9 @@ function renderReadout() {
         <br><button id="reqGpsBtn">Aktivera platstjänster</button>
       </div>`;
   } else {
-    const dF = fmt(haversine(position, h.green.front));
-    const dM = fmt(haversine(position, h.green.middle));
-    const dB = fmt(haversine(position, h.green.back));
+    const dF = fmt(haversine(position, g.front));
+    const dM = fmt(haversine(position, g.middle));
+    const dB = fmt(haversine(position, g.back));
     inner += `
       <div class="label">Hål ${currentHole} · Mitten av green</div>
       <div class="mid">${dM}<small>m</small></div>
@@ -506,20 +653,21 @@ function renderReadout() {
       </div>`;
   }
   el.innerHTML = inner;
+
   document.getElementById("editGreenBtn").addEventListener("click", openGreenSheet);
   const tBtn = document.getElementById("testPosBtn");
   if (tBtn) tBtn.addEventListener("click", () => {
-    const g = currentCourse.holes[0].green.middle;
-    setPosition({ lat: g.lat - 0.0014, lng: g.lng - 0.0009, accuracy: 5, test: true });
+    const baseHole = currentCourse.holes[0];
+    const midPoint = (baseHole.green && baseHole.green.middle) || {lat:59.315384,lng:17.859145};
+    setPosition({ lat: midPoint.lat - 0.0014, lng: midPoint.lng - 0.0009, accuracy: 5, test: true });
   });
   const rBtn = document.getElementById("reqGpsBtn");
   if (rBtn) rBtn.addEventListener("click", () => {
     navigator.geolocation.getCurrentPosition(
       p => setPosition({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
-      err => {
+      () => {
         const s = document.getElementById("gpsStatus");
-        s.textContent = "Blockerad";
-        s.className = "gps bad";
+        s.textContent = "Blockerad"; s.className = "gps bad";
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -548,19 +696,18 @@ function renderPois() {
   list.querySelectorAll(".edit").forEach(btn => {
     btn.addEventListener("click", () => {
       const id = btn.closest(".poi").dataset.id;
-      const p = holePois().find(x => x.id === id);
+      const p  = holePois().find(x => x.id === id);
       if (p) openPoiSheet({ hole: currentHole, poi: p });
     });
   });
   list.querySelectorAll(".del").forEach(btn => {
     btn.addEventListener("click", () => {
       if (!btn.classList.contains("confirm")) {
-        btn.classList.add("confirm");
-        btn.textContent = "Ta bort?";
+        btn.classList.add("confirm"); btn.textContent = "Ta bort?";
         setTimeout(() => { btn.classList.remove("confirm"); btn.textContent = "✕"; }, 3000);
         return;
       }
-      const id = btn.closest(".poi").dataset.id;
+      const id  = btn.closest(".poi").dataset.id;
       const arr = holePois();
       const idx = arr.findIndex(p => p.id === id);
       if (idx > -1) arr.splice(idx, 1);
@@ -582,7 +729,6 @@ function setPosition(pos) {
   }
   renderReadout(); renderPois();
 }
-
 function startGps() {
   if (gpsStarted || !("geolocation" in navigator)) return;
   gpsStarted = true;
@@ -600,65 +746,48 @@ const poiLng = document.getElementById("poiLng");
 attachPairSplit(poiLat, poiLng);
 
 function openPoiSheet(existing) {
-  const title = document.getElementById("poiSheetTitle");
-  const nameEl = document.getElementById("poiName");
+  const title   = document.getElementById("poiSheetTitle");
+  const nameEl  = document.getElementById("poiName");
   const holeSel = document.getElementById("poiHoleSelect");
   document.getElementById("poiErr").classList.remove("show");
   poiLat.classList.remove("invalid"); poiLng.classList.remove("invalid");
-
   holeSel.innerHTML = currentCourse.holes.map(h =>
-    `<option value="${h.hole}">Hål ${h.hole}</option>`
-  ).join("");
-
+    `<option value="${h.hole}">Hål ${h.hole}</option>`).join("");
   if (existing) {
     editingPoi = { hole: existing.hole, id: existing.poi.id };
-    title.textContent = "Redigera markering";
-    nameEl.value = existing.poi.name;
-    holeSel.value = existing.hole;
-    poiLat.value = existing.poi.lat.toFixed(6);
-    poiLng.value = existing.poi.lng.toFixed(6);
+    title.textContent  = "Redigera markering";
+    nameEl.value       = existing.poi.name;
+    holeSel.value      = existing.hole;
+    poiLat.value       = existing.poi.lat.toFixed(6);
+    poiLng.value       = existing.poi.lng.toFixed(6);
   } else {
     editingPoi = null;
     title.textContent = "Ny markering";
     nameEl.value = "";
     holeSel.value = currentHole;
-    if (position) {
-      poiLat.value = position.lat.toFixed(6);
-      poiLng.value = position.lng.toFixed(6);
-    } else {
-      poiLat.value = ""; poiLng.value = "";
-    }
+    if (position) { poiLat.value = position.lat.toFixed(6); poiLng.value = position.lng.toFixed(6); }
+    else { poiLat.value = ""; poiLng.value = ""; }
   }
   poiOverlay.classList.add("open");
   if (!existing) setTimeout(() => nameEl.focus(), 50);
 }
-
-function closePoiSheet() {
-  poiOverlay.classList.remove("open");
-  editingPoi = null;
-}
-
+function closePoiSheet() { poiOverlay.classList.remove("open"); editingPoi = null; }
 function savePoiFromSheet() {
-  const err = document.getElementById("poiErr");
+  const err  = document.getElementById("poiErr");
   const name = document.getElementById("poiName").value.trim();
   const hole = Number(document.getElementById("poiHoleSelect").value);
   const coord = readCoord(poiLat, poiLng);
-  if (!name) { err.textContent = "Ge markeringen ett namn."; err.classList.add("show"); return; }
+  if (!name)  { err.textContent = "Ge markeringen ett namn."; err.classList.add("show"); return; }
   if (!coord) { err.textContent = "Kontrollera koordinaterna – latitud och longitud måste vara giltiga tal."; err.classList.add("show"); return; }
-
   if (!pois[currentCourse.id]) pois[currentCourse.id] = {};
   if (!pois[currentCourse.id][hole]) pois[currentCourse.id][hole] = [];
-
   if (editingPoi) {
     const oldArr = pois[currentCourse.id][editingPoi.hole] || [];
-    const idx = oldArr.findIndex(p => p.id === editingPoi.id);
+    const idx    = oldArr.findIndex(p => p.id === editingPoi.id);
     if (idx > -1) {
       const p = oldArr[idx];
       p.name = name; p.lat = coord.lat; p.lng = coord.lng;
-      if (hole !== editingPoi.hole) {
-        oldArr.splice(idx, 1);
-        pois[currentCourse.id][hole].push(p);
-      }
+      if (hole !== editingPoi.hole) { oldArr.splice(idx, 1); pois[currentCourse.id][hole].push(p); }
     }
   } else {
     pois[currentCourse.id][hole].push({
@@ -666,12 +795,8 @@ function savePoiFromSheet() {
       name, lat: coord.lat, lng: coord.lng
     });
   }
-  savePois();
-  closePoiSheet();
-  if (hole !== currentHole) {
-    currentHole = hole;
-    renderHoleChips(); renderReadout();
-  }
+  savePois(); closePoiSheet();
+  if (hole !== currentHole) { currentHole = hole; renderHoleChips(); renderReadout(); }
   renderPois();
 }
 
@@ -690,19 +815,20 @@ function openGreenSheet() {
   const g = holeData().green;
   for (const part of ["front", "middle", "back"]) {
     const [la, ln] = gInputs[part];
-    la.value = g[part].lat.toFixed(6);
-    ln.value = g[part].lng.toFixed(6);
+    la.value = (g && g[part]) ? g[part].lat.toFixed(6) : "";
+    ln.value = (g && g[part]) ? g[part].lng.toFixed(6) : "";
     la.classList.remove("invalid"); ln.classList.remove("invalid");
   }
+  // Visa "koda"-knappen bara för hårdkodade banor
+  document.getElementById("showCodeBtn").style.display =
+    getFirestoreCourse(currentCourse.id) ? "none" : "";
   document.getElementById("codeView").classList.remove("open");
   document.getElementById("greenForm").classList.remove("hidden");
   greenOverlay.classList.add("open");
 }
-
 function closeGreenSheet() { greenOverlay.classList.remove("open"); }
-
-function saveGreenFromSheet() {
-  const err = document.getElementById("greenErr");
+async function saveGreenFromSheet() {
+  const err    = document.getElementById("greenErr");
   const result = {};
   for (const part of ["front", "middle", "back"]) {
     const coord = readCoord(gInputs[part][0], gInputs[part][1]);
@@ -712,25 +838,31 @@ function saveGreenFromSheet() {
     }
     result[part] = coord;
   }
-  if (!greenEdits[currentCourse.id]) greenEdits[currentCourse.id] = {};
-  greenEdits[currentCourse.id][currentHole] = result;
-  saveGreenEdits(); closeGreenSheet(); renderReadout();
+  if (isOwnFirestoreCourse(currentCourse.id)) {
+    // Ägaren sparar direkt i banans data
+    await updateCourseGreen(currentCourse.id, currentHole, result);
+  } else {
+    // Sparar som personlig override
+    if (!greenEdits[currentCourse.id]) greenEdits[currentCourse.id] = {};
+    greenEdits[currentCourse.id][currentHole] = result;
+    saveGreenEdits();
+  }
+  closeGreenSheet(); renderReadout();
 }
 
-/* ---- Kodexport ---- */
+/* ---- Kodexport (endast för hårdkodade banor) ---- */
 function buildCourseCode(course) {
-  const num = n => n.toFixed(6);
+  const num = n => (n ? n.toFixed(6) : "0.000000");
   const lines = course.holes.map(h => {
-    const g = greenFor(course.id, h.hole);
+    const g = greenFor(course.id, h.hole) || { front: null, middle: null, back: null };
     return `      { hole: ${h.hole}, green: { ` +
-      `front:{lat:${num(g.front.lat)},lng:${num(g.front.lng)}}, ` +
-      `middle:{lat:${num(g.middle.lat)},lng:${num(g.middle.lng)}}, ` +
-      `back:{lat:${num(g.back.lat)},lng:${num(g.back.lng)}} } }`;
+      `front:{lat:${num(g.front&&g.front.lat)},lng:${num(g.front&&g.front.lng)}}, ` +
+      `middle:{lat:${num(g.middle&&g.middle.lat)},lng:${num(g.middle&&g.middle.lng)}}, ` +
+      `back:{lat:${num(g.back&&g.back.lat)},lng:${num(g.back&&g.back.lng)}} } }`;
   });
   return `  {\n    id: ${JSON.stringify(course.id)},\n    name: ${JSON.stringify(course.name)},\n    holes: [\n` +
          lines.join(",\n") + `\n    ]\n  }`;
 }
-
 function showCodeView() {
   document.getElementById("codeArea").value = buildCourseCode(currentCourse);
   document.getElementById("greenForm").classList.add("hidden");
@@ -757,31 +889,129 @@ function copyCode() {
   }
 }
 
+/* ---- Sheet: ny bana ---- */
+const newCourseOverlay = document.getElementById("newCourseOverlay");
+
+function openNewCourseSheet() {
+  document.getElementById("newCourseName").value = "";
+  document.getElementById("newCourseHoles").value = "18";
+  document.getElementById("newCourseErr").classList.remove("show");
+  newCourseOverlay.classList.add("open");
+  setTimeout(() => document.getElementById("newCourseName").focus(), 50);
+}
+function closeNewCourseSheet() { newCourseOverlay.classList.remove("open"); }
+
+async function saveNewCourse(shared) {
+  const name      = document.getElementById("newCourseName").value.trim();
+  const holeCount = Number(document.getElementById("newCourseHoles").value);
+  const err       = document.getElementById("newCourseErr");
+  if (!name) { err.textContent = "Ange ett namn på banan."; err.classList.add("show"); return; }
+
+  const btn = shared
+    ? document.getElementById("saveSharedCourse")
+    : document.getElementById("savePrivateCourse");
+  btn.textContent = "Sparar…"; btn.disabled = true;
+
+  try {
+    const course = await createCourse(name, holeCount, shared);
+    closeNewCourseSheet();
+    currentCourse = COURSES.find(c => c.id === course.id);
+    currentHole   = currentCourse.holes[0].hole;
+    renderCourseSelect();
+    renderHoleChips();
+    renderReadout();
+    renderPois();
+  } catch (e) {
+    err.textContent = "Kunde inte spara banan. Försök igen."; err.classList.add("show");
+  } finally {
+    btn.textContent = shared ? "Dela banan med alla" : "Spara som min bana";
+    btn.disabled = false;
+  }
+}
+
+/* ---- Sheet: hantera bana ---- */
+const manageCourseOverlay = document.getElementById("manageCourseOverlay");
+
+function openManageCourseSheet() {
+  const fc = getFirestoreCourse(currentCourse.id);
+  if (!fc) return;
+  document.getElementById("manageCourseTitle").textContent = esc(fc.name);
+  const tag  = document.getElementById("manageCourseTag");
+  const desc = document.getElementById("manageCourseDesc");
+  const toggleBtn = document.getElementById("toggleShareBtn");
+  if (fc.shared) {
+    tag.textContent = "Delad"; tag.className = "status-tag shared";
+    desc.textContent = "Alla inloggade användare kan se den här banan.";
+    toggleBtn.textContent = "Gör privat";
+  } else {
+    tag.textContent = "Privat"; tag.className = "status-tag private";
+    desc.textContent = "Bara du kan se den här banan.";
+    toggleBtn.textContent = "Dela med alla";
+  }
+  deleteCourseConfirmed = false;
+  document.getElementById("deleteCourseBtn").textContent = "Ta bort bana";
+  manageCourseOverlay.classList.add("open");
+}
+function closeManageCourseSheet() { manageCourseOverlay.classList.remove("open"); }
+
 /* ---- Händelselyssnare (app) ---- */
 document.getElementById("courseSelect").addEventListener("change", e => {
   currentCourse = COURSES.find(c => c.id === e.target.value);
   currentHole   = currentCourse.holes[0].hole;
+  updateManageBtn();
   renderHoleChips(); renderReadout(); renderPois();
 });
+
+document.getElementById("newCourseBtn").addEventListener("click", openNewCourseSheet);
+document.getElementById("manageCourseBtn").addEventListener("click", openManageCourseSheet);
+
+document.getElementById("savePrivateCourse").addEventListener("click", () => saveNewCourse(false));
+document.getElementById("saveSharedCourse").addEventListener("click",  () => saveNewCourse(true));
+document.getElementById("cancelNewCourse").addEventListener("click", closeNewCourseSheet);
+newCourseOverlay.addEventListener("click", e => { if (e.target === newCourseOverlay) closeNewCourseSheet(); });
+
+document.getElementById("toggleShareBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("toggleShareBtn");
+  btn.textContent = "Sparar…"; btn.disabled = true;
+  await toggleCourseSharing(currentCourse.id);
+  renderCourseSelect();
+  openManageCourseSheet();
+  btn.disabled = false;
+});
+document.getElementById("deleteCourseBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("deleteCourseBtn");
+  if (!deleteCourseConfirmed) {
+    deleteCourseConfirmed = true;
+    btn.textContent = "Är du säker? Tryck igen";
+    setTimeout(() => { deleteCourseConfirmed = false; btn.textContent = "Ta bort bana"; }, 4000);
+    return;
+  }
+  btn.textContent = "Tar bort…"; btn.disabled = true;
+  await removeCourse(currentCourse.id);
+  currentCourse = COURSES[0];
+  currentHole   = currentCourse.holes[0].hole;
+  closeManageCourseSheet();
+  renderCourseSelect();
+  renderHoleChips(); renderReadout(); renderPois();
+});
+document.getElementById("cancelManageCourse").addEventListener("click", closeManageCourseSheet);
+manageCourseOverlay.addEventListener("click", e => { if (e.target === manageCourseOverlay) closeManageCourseSheet(); });
+
 document.getElementById("addPoiBtn").addEventListener("click", () => openPoiSheet(null));
 document.getElementById("cancelPoi").addEventListener("click", closePoiSheet);
 document.getElementById("savePoi").addEventListener("click", savePoiFromSheet);
 document.getElementById("useGpsBtn").addEventListener("click", () => {
   if (!position) {
     const err = document.getElementById("poiErr");
-    err.textContent = "Ingen GPS-position tillgänglig ännu.";
-    err.classList.add("show"); return;
+    err.textContent = "Ingen GPS-position tillgänglig ännu."; err.classList.add("show"); return;
   }
-  poiLat.value = position.lat.toFixed(6);
-  poiLng.value = position.lng.toFixed(6);
+  poiLat.value = position.lat.toFixed(6); poiLng.value = position.lng.toFixed(6);
 });
-document.getElementById("poiName").addEventListener("keydown", e => {
-  if (e.key === "Enter") savePoiFromSheet();
-});
+document.getElementById("poiName").addEventListener("keydown", e => { if (e.key === "Enter") savePoiFromSheet(); });
 poiOverlay.addEventListener("click", e => { if (e.target === poiOverlay) closePoiSheet(); });
 
 document.getElementById("cancelGreen").addEventListener("click", closeGreenSheet);
-document.getElementById("saveGreen").addEventListener("click", saveGreenFromSheet);
+document.getElementById("saveGreen").addEventListener("click", () => saveGreenFromSheet());
 document.getElementById("showCodeBtn").addEventListener("click", showCodeView);
 document.getElementById("backFromCode").addEventListener("click", hideCodeView);
 document.getElementById("copyCode").addEventListener("click", copyCode);
@@ -795,35 +1025,22 @@ document.getElementById("googleBtn").addEventListener("click", async () => {
     await signInWithPopup(auth, new GoogleAuthProvider());
   } catch (e) {
     if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
-      errEl.textContent = authErrorMessage(e.code);
+      errEl.textContent = "Inloggningsfel. Försök igen.";
       errEl.classList.add("show");
     }
   }
 });
-
 document.getElementById("signOutBtn").addEventListener("click", () => signOut(auth));
 
-function authErrorMessage(code) {
-  const msgs = {
-    "auth/invalid-email":          "Ogiltig e-postadress.",
-    "auth/user-not-found":         "Inget konto med den e-postadressen.",
-    "auth/wrong-password":         "Fel lösenord.",
-    "auth/invalid-credential":     "Fel e-post eller lösenord.",
-    "auth/email-already-in-use":   "Det finns redan ett konto med den e-postadressen.",
-    "auth/weak-password":          "Lösenordet måste vara minst 6 tecken.",
-    "auth/too-many-requests":      "För många försök. Försök igen senare.",
-    "auth/network-request-failed": "Nätverksfel. Kontrollera anslutningen.",
-  };
-  return msgs[code] || "Inloggningsfel. Försök igen.";
-}
-
-/* ---- Auth-tillstånd → styr app ---- */
+/* ---- Auth-tillstånd ---- */
 onAuthStateChanged(auth, async user => {
   if (user) {
     currentUid = user.uid;
     document.getElementById("authOverlay").classList.remove("open");
     document.getElementById("signOutBtn").style.display = "";
-    await loadStored();
+    await Promise.all([loadCourses(), loadStored()]);
+    currentCourse = COURSES[0];
+    currentHole   = currentCourse.holes[0].hole;
     renderCourseSelect();
     renderHoleChips();
     renderReadout();
@@ -832,6 +1049,7 @@ onAuthStateChanged(auth, async user => {
   } else {
     currentUid = null;
     pois = {}; greenEdits = {}; position = null;
+    firestoreCourses = []; COURSES = [...BASE_COURSES];
     document.getElementById("authOverlay").classList.add("open");
     document.getElementById("signOutBtn").style.display = "none";
     document.getElementById("gpsStatus").textContent = "Ingen GPS";
