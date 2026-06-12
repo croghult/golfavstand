@@ -32,6 +32,7 @@
     padding:14px 16px 6px;
   }
   header h1{font-size:15px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .header-right{display:flex;gap:8px;align-items:center}
   .gps{
     font-size:12px;font-weight:600;
     padding:4px 10px;border-radius:99px;
@@ -195,13 +196,37 @@
     height:240px;white-space:pre;
   }
   .form-view.hidden{display:none}
+
+  /* Auth */
+  .auth-overlay{z-index:20}
+  .google-btn{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    width:100%;padding:13px;
+    font-size:15px;font-weight:600;color:var(--ink);
+    background:var(--card);border:1.5px solid var(--line);border-radius:10px;
+  }
+  .auth-divider{
+    display:flex;align-items:center;gap:10px;
+    color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;margin:14px 0;
+  }
+  .auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--line)}
+  .sign-out-btn{
+    font-size:12px;font-weight:600;
+    padding:4px 10px;border-radius:99px;
+    border:1px solid var(--line);background:var(--card);
+    color:var(--muted);
+  }
 </style>
 </head>
 <body>
 
 <header>
   <h1>Golfavstånd</h1>
-  <span class="gps bad" id="gpsStatus">Ingen GPS</span>
+  <div class="header-right">
+    <button class="sign-out-btn" id="signOutBtn" style="display:none">Logga ut</button>
+    <span class="gps bad" id="gpsStatus">Ingen GPS</span>
+  </div>
 </header>
 
 <div class="course-row">
@@ -289,26 +314,69 @@
   </div>
 </div>
 
-<script>
+<!-- Auth overlay -->
+<div class="overlay auth-overlay open" id="authOverlay">
+  <div class="sheet">
+    <h3 id="authTitle">Logga in</h3>
+    <button class="google-btn" id="googleBtn">
+      <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908C16.658 14.013 17.64 11.706 17.64 9.2z" fill="#4285F4"/>
+        <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+        <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+      </svg>
+      Fortsätt med Google
+    </button>
+    <div class="auth-divider">eller</div>
+    <label for="authEmail">E-post</label>
+    <input id="authEmail" type="email" placeholder="din@epost.se" autocomplete="email">
+    <label for="authPassword">Lösenord</label>
+    <input id="authPassword" type="password" placeholder="••••••••" autocomplete="current-password">
+    <div class="err" id="authErr"></div>
+    <div class="actions">
+      <button class="btn-save" id="authSubmit">Logga in</button>
+    </div>
+    <p style="text-align:center;margin-top:16px;font-size:14px;color:var(--muted)">
+      Inget konto?&nbsp;<button class="inline-btn" id="authToggle" style="margin-top:0">Skapa konto</button>
+    </p>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }
+  from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import { getAnalytics }
+  from "https://www.gstatic.com/firebasejs/12.14.0/firebase-analytics.js";
+import {
+  getAuth, onAuthStateChanged,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signInWithPopup, GoogleAuthProvider, signOut
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+import {
+  initializeFirestore, persistentLocalCache,
+  doc, getDoc, setDoc
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+/* ---- Firebase init ---- */
+const firebaseConfig = {
+  apiKey: "AIzaSyDNk1jL0eAIPMk9F2yyfHRQG6mr0aab7M4",
+  authDomain: "roghultgolfrange.firebaseapp.com",
+  projectId: "roghultgolfrange",
+  storageBucket: "roghultgolfrange.firebasestorage.app",
+  messagingSenderId: "672584724048",
+  appId: "1:672584724048:web:525fffedaab9009c092b55",
+  measurementId: "G-67HB3VHPS4"
+};
+const app = initializeApp(firebaseConfig);
+getAnalytics(app);
+const auth = getAuth(app);
+const db  = initializeFirestore(app, { localCache: persistentLocalCache() });
+
 /* ================================================================
-   BANDATA – grunddata som du redigerar i koden.
-
-   Hämta koordinater från Google Maps i satellitvy:
-   högerklicka (eller långtryck i mobilen) på greenens framkant,
-   mitt och bakkant, kopiera koordinaterna och klistra in nedan.
-
-   Du kan också redigera greenkoordinater direkt i appen
-   ("Redigera"-knappen på avståndskortet). Sådana ändringar sparas
-   i appens lagring och gäller framför värdena här i koden.
-   Knappen "Visa banans data som kod" ger dig färdig kod att
-   klistra tillbaka hit när du vill göra ändringarna permanenta.
-
-   Exempelbanan nedan har påhittade koordinater – ersätt dem!
+   BANDATA
    ================================================================ */
-
-   
 const COURSES = [
-    {
+  {
     id: "KDRGK",
     name: "Kungliga Drottningholms GK",
     holes: [
@@ -324,42 +392,16 @@ const COURSES = [
     ]
   }
 ];
-/* ============== SLUT PÅ BANDATA ============== */
-
-/* ---- Lagring ----
-   I Claude-artifacten används window.storage.
-   Hostar du filen själv (t.ex. GitHub Pages) används
-   webbläsarens lokala lagring i stället. */
-const store = (() => {
-  if (window.storage) return window.storage;
-  let ls = null;
-  try {
-    const t = "__golf_test__";
-    window.localStorage.setItem(t, "1");
-    window.localStorage.removeItem(t);
-    ls = window.localStorage;
-  } catch (e) { ls = null; }
-  const mem = {};
-  return {
-    async get(key) {
-      const v = ls ? ls.getItem("golf:" + key) : (key in mem ? mem[key] : null);
-      if (v === null || v === undefined) throw new Error("not found");
-      return { key, value: v };
-    },
-    async set(key, value) {
-      if (ls) ls.setItem("golf:" + key, value); else mem[key] = value;
-      return { key, value };
-    }
-  };
-})();
 
 /* ---- Tillstånd ---- */
 let currentCourse = COURSES[0];
-let currentHole = currentCourse.holes[0].hole;
-let position = null;            // {lat, lng, accuracy}
-let pois = {};                  // { courseId: { hole: [ {id,name,lat,lng} ] } }
-let greenEdits = {};            // { courseId: { hole: {front,middle,back} } }
-let editingPoi = null;          // {hole, id} när en markering redigeras
+let currentHole   = currentCourse.holes[0].hole;
+let position      = null;
+let pois          = {};
+let greenEdits    = {};
+let editingPoi    = null;
+let currentUid    = null;
+let gpsStarted    = false;
 
 /* ---- Hjälpfunktioner ---- */
 function haversine(a, b) {
@@ -386,7 +428,6 @@ function holePois() {
   return (pois[currentCourse.id] && pois[currentCourse.id][currentHole]) || [];
 }
 
-/* Klistra in "lat, lng" i ett lat-fält => dela upp i båda fälten */
 function attachPairSplit(latInput, lngInput) {
   latInput.addEventListener("input", () => {
     const m = latInput.value.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
@@ -404,20 +445,31 @@ function readCoord(latInput, lngInput) {
   return ok ? { lat, lng } : null;
 }
 
-/* ---- Lagring av data ---- */
+/* ---- Firestore-lagring ---- */
 async function loadStored() {
-  try { pois = JSON.parse((await store.get("pois")).value) || {}; }
-  catch (e) { pois = {}; }
-  try { greenEdits = JSON.parse((await store.get("greens")).value) || {}; }
-  catch (e) { greenEdits = {}; }
+  if (!currentUid) return;
+  try {
+    const snap = await getDoc(doc(db, "users", currentUid));
+    const data = snap.exists() ? snap.data() : {};
+    pois       = data.pois   ? JSON.parse(data.pois)   : {};
+    greenEdits = data.greens ? JSON.parse(data.greens) : {};
+  } catch (e) {
+    pois = {}; greenEdits = {};
+  }
 }
+
 async function savePois() {
-  try { await store.set("pois", JSON.stringify(pois)); }
-  catch (e) { console.error("Kunde inte spara markeringar:", e); }
+  if (!currentUid) return;
+  try {
+    await setDoc(doc(db, "users", currentUid), { pois: JSON.stringify(pois) }, { merge: true });
+  } catch (e) { console.error("Kunde inte spara markeringar:", e); }
 }
+
 async function saveGreenEdits() {
-  try { await store.set("greens", JSON.stringify(greenEdits)); }
-  catch (e) { console.error("Kunde inte spara greendata:", e); }
+  if (!currentUid) return;
+  try {
+    await setDoc(doc(db, "users", currentUid), { greens: JSON.stringify(greenEdits) }, { merge: true });
+  } catch (e) { console.error("Kunde inte spara greendata:", e); }
 }
 
 /* ---- Rendering ---- */
@@ -436,9 +488,7 @@ function renderHoleChips() {
   wrap.querySelectorAll(".hole-chip").forEach(btn => {
     btn.addEventListener("click", () => {
       currentHole = Number(btn.dataset.hole);
-      renderHoleChips();
-      renderReadout();
-      renderPois();
+      renderHoleChips(); renderReadout(); renderPois();
     });
   });
 }
@@ -513,8 +563,7 @@ function renderPois() {
       const arr = holePois();
       const idx = arr.findIndex(p => p.id === id);
       if (idx > -1) arr.splice(idx, 1);
-      savePois();
-      renderPois();
+      savePois(); renderPois();
     });
   });
 }
@@ -524,19 +573,18 @@ function setPosition(pos) {
   position = pos;
   const s = document.getElementById("gpsStatus");
   if (pos.test) {
-    s.textContent = "Testläge";
-    s.className = "gps ok";
+    s.textContent = "Testläge"; s.className = "gps ok";
   } else {
     const acc = Math.round(pos.accuracy);
     s.textContent = "±" + acc + " m";
     s.className = "gps " + (acc <= 10 ? "good" : acc <= 25 ? "ok" : "bad");
   }
-  renderReadout();
-  renderPois();
+  renderReadout(); renderPois();
 }
 
 function startGps() {
-  if (!("geolocation" in navigator)) return;
+  if (gpsStarted || !("geolocation" in navigator)) return;
+  gpsStarted = true;
   navigator.geolocation.watchPosition(
     p => setPosition({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
     err => console.warn("GPS-fel:", err.message),
@@ -621,8 +669,7 @@ function savePoiFromSheet() {
   closePoiSheet();
   if (hole !== currentHole) {
     currentHole = hole;
-    renderHoleChips();
-    renderReadout();
+    renderHoleChips(); renderReadout();
   }
   renderPois();
 }
@@ -651,9 +698,7 @@ function openGreenSheet() {
   greenOverlay.classList.add("open");
 }
 
-function closeGreenSheet() {
-  greenOverlay.classList.remove("open");
-}
+function closeGreenSheet() { greenOverlay.classList.remove("open"); }
 
 function saveGreenFromSheet() {
   const err = document.getElementById("greenErr");
@@ -662,16 +707,13 @@ function saveGreenFromSheet() {
     const coord = readCoord(gInputs[part][0], gInputs[part][1]);
     if (!coord) {
       err.textContent = "Kontrollera koordinaterna – alla sex fälten måste vara giltiga tal.";
-      err.classList.add("show");
-      return;
+      err.classList.add("show"); return;
     }
     result[part] = coord;
   }
   if (!greenEdits[currentCourse.id]) greenEdits[currentCourse.id] = {};
   greenEdits[currentCourse.id][currentHole] = result;
-  saveGreenEdits();
-  closeGreenSheet();
-  renderReadout();
+  saveGreenEdits(); closeGreenSheet(); renderReadout();
 }
 
 /* ---- Kodexport ---- */
@@ -714,13 +756,11 @@ function copyCode() {
   }
 }
 
-/* ---- Init & händelser ---- */
+/* ---- Händelselyssnare (app) ---- */
 document.getElementById("courseSelect").addEventListener("change", e => {
   currentCourse = COURSES.find(c => c.id === e.target.value);
-  currentHole = currentCourse.holes[0].hole;
-  renderHoleChips();
-  renderReadout();
-  renderPois();
+  currentHole   = currentCourse.holes[0].hole;
+  renderHoleChips(); renderReadout(); renderPois();
 });
 document.getElementById("addPoiBtn").addEventListener("click", () => openPoiSheet(null));
 document.getElementById("cancelPoi").addEventListener("click", closePoiSheet);
@@ -729,8 +769,7 @@ document.getElementById("useGpsBtn").addEventListener("click", () => {
   if (!position) {
     const err = document.getElementById("poiErr");
     err.textContent = "Ingen GPS-position tillgänglig ännu.";
-    err.classList.add("show");
-    return;
+    err.classList.add("show"); return;
   }
   poiLat.value = position.lat.toFixed(6);
   poiLng.value = position.lng.toFixed(6);
@@ -747,14 +786,93 @@ document.getElementById("backFromCode").addEventListener("click", hideCodeView);
 document.getElementById("copyCode").addEventListener("click", copyCode);
 greenOverlay.addEventListener("click", e => { if (e.target === greenOverlay) closeGreenSheet(); });
 
-(async function init() {
-  await loadStored();
-  renderCourseSelect();
-  renderHoleChips();
-  renderReadout();
-  renderPois();
-  startGps();
-})();
+/* ---- Auth UI ---- */
+let authMode = "signin"; // "signin" | "signup"
+
+document.getElementById("authToggle").addEventListener("click", () => {
+  authMode = authMode === "signin" ? "signup" : "signin";
+  const isSignup = authMode === "signup";
+  document.getElementById("authTitle").textContent   = isSignup ? "Skapa konto" : "Logga in";
+  document.getElementById("authSubmit").textContent  = isSignup ? "Skapa konto" : "Logga in";
+  document.getElementById("authToggle").textContent  = isSignup ? "Logga in istället" : "Skapa konto";
+  document.getElementById("authErr").classList.remove("show");
+});
+
+document.getElementById("authSubmit").addEventListener("click", async () => {
+  const email    = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const errEl    = document.getElementById("authErr");
+  errEl.classList.remove("show");
+  if (!email || !password) {
+    errEl.textContent = "Fyll i e-post och lösenord.";
+    errEl.classList.add("show"); return;
+  }
+  try {
+    if (authMode === "signup") {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } else {
+      await signInWithEmailAndPassword(auth, email, password);
+    }
+  } catch (e) {
+    errEl.textContent = authErrorMessage(e.code);
+    errEl.classList.add("show");
+  }
+});
+
+document.getElementById("authPassword").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("authSubmit").click();
+});
+
+document.getElementById("googleBtn").addEventListener("click", async () => {
+  const errEl = document.getElementById("authErr");
+  errEl.classList.remove("show");
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (e) {
+    if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
+      errEl.textContent = authErrorMessage(e.code);
+      errEl.classList.add("show");
+    }
+  }
+});
+
+document.getElementById("signOutBtn").addEventListener("click", () => signOut(auth));
+
+function authErrorMessage(code) {
+  const msgs = {
+    "auth/invalid-email":          "Ogiltig e-postadress.",
+    "auth/user-not-found":         "Inget konto med den e-postadressen.",
+    "auth/wrong-password":         "Fel lösenord.",
+    "auth/invalid-credential":     "Fel e-post eller lösenord.",
+    "auth/email-already-in-use":   "Det finns redan ett konto med den e-postadressen.",
+    "auth/weak-password":          "Lösenordet måste vara minst 6 tecken.",
+    "auth/too-many-requests":      "För många försök. Försök igen senare.",
+    "auth/network-request-failed": "Nätverksfel. Kontrollera anslutningen.",
+  };
+  return msgs[code] || "Inloggningsfel. Försök igen.";
+}
+
+/* ---- Auth-tillstånd → styr app ---- */
+onAuthStateChanged(auth, async user => {
+  if (user) {
+    currentUid = user.uid;
+    document.getElementById("authOverlay").classList.remove("open");
+    document.getElementById("signOutBtn").style.display = "";
+    await loadStored();
+    renderCourseSelect();
+    renderHoleChips();
+    renderReadout();
+    renderPois();
+    startGps();
+  } else {
+    currentUid = null;
+    pois = {}; greenEdits = {}; position = null;
+    document.getElementById("authOverlay").classList.add("open");
+    document.getElementById("signOutBtn").style.display = "none";
+    document.getElementById("gpsStatus").textContent = "Ingen GPS";
+    document.getElementById("gpsStatus").className = "gps bad";
+  }
+});
 </script>
 </body>
 </html>
