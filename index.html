@@ -261,6 +261,31 @@
     border-top:none;margin-top:0;
   }
   .img-uploading{opacity:.5;pointer-events:none}
+  /* Kompass */
+  .compass-btn{
+    position:absolute;top:10px;left:10px;
+    font-size:17px;line-height:1;
+    background:var(--bg);border:1px solid var(--line);
+    border-radius:99px;padding:5px 10px;
+  }
+  .compass-overlay{align-items:center;z-index:15}
+  .compass-sheet{
+    background:var(--card);
+    width:calc(100% - 32px);max-width:360px;
+    border-radius:20px;
+    padding:24px 20px calc(28px + env(safe-area-inset-bottom));
+    text-align:center;
+  }
+  .compass-header{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:4px;
+  }
+  .target-chip{
+    font-size:13px;font-weight:600;
+    padding:7px 14px;border-radius:99px;
+    border:1px solid var(--line);background:var(--bg);color:var(--ink);
+  }
+  .target-chip.active{background:var(--green);border-color:var(--green);color:#fff}
   .status-tag{
     display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;
     text-transform:uppercase;padding:3px 8px;border-radius:6px;
@@ -396,6 +421,45 @@
       <button class="btn-danger" id="deleteCourseBtn">Ta bort bana</button>
       <button class="btn-cancel" id="cancelManageCourse">Stäng</button>
     </div>
+  </div>
+</div>
+
+<!-- Kompassoverlay -->
+<div class="overlay compass-overlay" id="compassOverlay">
+  <div class="compass-sheet">
+    <div class="compass-header">
+      <span id="compassTargetName" style="font-size:14px;font-weight:600;color:var(--muted)">Green – mitt</span>
+      <button class="inline-btn" style="margin:0" id="closeCompass">✕</button>
+    </div>
+    <div style="display:flex;justify-content:center;margin:16px 0 8px">
+      <svg viewBox="0 0 240 240" width="210" height="210" id="compassSvg">
+        <circle cx="120" cy="120" r="112" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+        <circle cx="120" cy="120" r="88" fill="none" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 6"/>
+        <!-- Tick marks -->
+        <g stroke="var(--line)" stroke-width="1.5">
+          <line x1="120" y1="8"  x2="120" y2="22"/>
+          <line x1="120" y1="218" x2="120" y2="232"/>
+          <line x1="8"   y1="120" x2="22"  y2="120"/>
+          <line x1="218" y1="120" x2="232" y2="120"/>
+        </g>
+        <!-- Cardinal labels -->
+        <text x="120" y="6"   text-anchor="middle" dominant-baseline="hanging" font-size="17" font-weight="800" fill="var(--red)"      font-family="-apple-system,sans-serif">N</text>
+        <text x="234" y="120" text-anchor="middle" dominant-baseline="middle"  font-size="13" font-weight="600" fill="var(--muted)"    font-family="-apple-system,sans-serif">Ö</text>
+        <text x="120" y="234" text-anchor="middle" dominant-baseline="auto"    font-size="13" font-weight="600" fill="var(--muted)"    font-family="-apple-system,sans-serif">S</text>
+        <text x="6"   y="120" text-anchor="middle" dominant-baseline="middle"  font-size="13" font-weight="600" fill="var(--muted)"    font-family="-apple-system,sans-serif">V</text>
+        <!-- Nål (roterar) -->
+        <g id="needleGroup" style="transform-origin:120px 120px;transition:transform .15s ease-out">
+          <polygon points="120,32 127,116 120,130 113,116" fill="var(--red)"/>
+          <polygon points="120,208 127,124 120,110 113,124" fill="#C8D4C2"/>
+          <circle cx="120" cy="120" r="9" fill="var(--ink)"/>
+          <circle cx="120" cy="120" r="4" fill="var(--card)"/>
+        </g>
+      </svg>
+    </div>
+    <div id="compassDist" style="font-size:48px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1">–</div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:2px 0 20px">meter</div>
+    <div id="compassTargets" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center"></div>
+    <div id="compassStatus" style="font-size:12px;color:var(--muted);margin-top:14px;min-height:18px"></div>
   </div>
 </div>
 
@@ -756,7 +820,8 @@ function renderReadout() {
   const g  = h.green;
   const hasCoords = g && g.front && g.middle && g.back;
 
-  let inner = `<button class="edit-green" id="editGreenBtn">Redigera</button>`;
+  let inner = `<button class="edit-green" id="editGreenBtn">Redigera</button>
+               <button class="compass-btn" id="openCompassBtn" aria-label="Öppna kompass">🧭</button>`;
 
   if (!hasCoords) {
     inner += `
@@ -785,6 +850,7 @@ function renderReadout() {
   el.innerHTML = inner;
 
   document.getElementById("editGreenBtn").addEventListener("click", openGreenSheet);
+  document.getElementById("openCompassBtn").addEventListener("click", openCompassSheet);
   const tBtn = document.getElementById("testPosBtn");
   if (tBtn) tBtn.addEventListener("click", () => {
     const baseHole = currentCourse.holes[0];
@@ -1147,6 +1213,123 @@ document.getElementById("showCodeBtn").addEventListener("click", showCodeView);
 document.getElementById("backFromCode").addEventListener("click", hideCodeView);
 document.getElementById("copyCode").addEventListener("click", copyCode);
 greenOverlay.addEventListener("click", e => { if (e.target === greenOverlay) closeGreenSheet(); });
+
+/* ---- Kompass ---- */
+let compassTarget  = null;
+let compassHeading = null;
+let compassOpen    = false;
+let orientationListenerActive = false;
+
+function bearingTo(from, to) {
+  const toRad = x => x * Math.PI / 180;
+  const toDeg = x => x * 180 / Math.PI;
+  const dLng  = toRad(to.lng - from.lng);
+  const lat1  = toRad(from.lat), lat2 = toRad(to.lat);
+  const x = Math.sin(dLng) * Math.cos(lat2);
+  const y = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (toDeg(Math.atan2(x, y)) + 360) % 360;
+}
+
+function updateCompassNeedle() {
+  if (!compassTarget || !position) return;
+  document.getElementById("compassDist").textContent = fmt(haversine(position, compassTarget));
+  const targetBearing = bearingTo(position, compassTarget);
+  const needle = document.getElementById("needleGroup");
+  if (compassHeading != null) {
+    needle.style.transform = `rotate(${(targetBearing - compassHeading + 360) % 360}deg)`;
+    document.getElementById("compassStatus").textContent = "";
+  } else {
+    needle.style.transform = `rotate(${targetBearing}deg)`;
+    document.getElementById("compassStatus").textContent = "Väntar på kompassdata…";
+  }
+}
+
+function onDeviceOrientation(e) {
+  if (!compassOpen) return;
+  if (e.webkitCompassHeading != null) {
+    compassHeading = e.webkitCompassHeading;
+  } else if (e.alpha != null) {
+    compassHeading = (360 - e.alpha) % 360;
+  }
+  updateCompassNeedle();
+}
+
+function startOrientationListener() {
+  if (orientationListenerActive) return;
+  orientationListenerActive = true;
+  window.addEventListener("deviceorientation", onDeviceOrientation, true);
+}
+
+async function requestCompassPermission() {
+  if (typeof DeviceOrientationEvent !== "undefined" &&
+      typeof DeviceOrientationEvent.requestPermission === "function") {
+    try {
+      const perm = await DeviceOrientationEvent.requestPermission();
+      if (perm === "granted") {
+        startOrientationListener();
+      } else {
+        document.getElementById("compassStatus").textContent =
+          "Kompassåtkomst nekad – tillåt i enhetsinställningarna.";
+      }
+    } catch (e) { startOrientationListener(); }
+  } else {
+    startOrientationListener();
+  }
+}
+
+function renderCompassTargets() {
+  const wrap = document.getElementById("compassTargets");
+  const g    = holeData().green;
+  const targets = [];
+  if (g && g.middle) targets.push({ lat: g.middle.lat, lng: g.middle.lng, name: "Green – mitt" });
+  if (g && g.front)  targets.push({ lat: g.front.lat,  lng: g.front.lng,  name: "Green – fram" });
+  if (g && g.back)   targets.push({ lat: g.back.lat,   lng: g.back.lng,   name: "Green – bak" });
+  holePois().forEach(p => targets.push({ lat: p.lat, lng: p.lng, name: p.name }));
+
+  if (!compassTarget && targets.length > 0) compassTarget = targets[0];
+
+  wrap.innerHTML = targets.map((t, i) => {
+    const active = compassTarget && t.lat === compassTarget.lat && t.lng === compassTarget.lng;
+    return `<button class="target-chip${active ? " active" : ""}" data-idx="${i}">${esc(t.name)}</button>`;
+  }).join("");
+
+  wrap._targets = targets;
+  wrap.querySelectorAll(".target-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      compassTarget = wrap._targets[Number(btn.dataset.idx)];
+      document.getElementById("compassTargetName").textContent = compassTarget.name;
+      wrap.querySelectorAll(".target-chip").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      updateCompassNeedle();
+    });
+  });
+  if (compassTarget)
+    document.getElementById("compassTargetName").textContent = compassTarget.name;
+}
+
+function openCompassSheet() {
+  if (!position) {
+    document.getElementById("compassStatus") &&
+      (document.getElementById("compassStatus").textContent = "");
+    // Öppna ändå — visa riktning utan avstånd
+  }
+  compassTarget = null;
+  renderCompassTargets();
+  updateCompassNeedle();
+  document.getElementById("compassOverlay").classList.add("open");
+  compassOpen = true;
+  requestCompassPermission();
+}
+
+function closeCompassSheet() {
+  document.getElementById("compassOverlay").classList.remove("open");
+  compassOpen = false;
+}
+
+document.getElementById("closeCompass").addEventListener("click", closeCompassSheet);
+document.getElementById("compassOverlay").addEventListener("click", e => {
+  if (e.target === document.getElementById("compassOverlay")) closeCompassSheet();
+});
 
 /* ---- Auth UI ---- */
 document.getElementById("googleBtn").addEventListener("click", async () => {
