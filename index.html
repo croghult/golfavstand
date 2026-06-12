@@ -31,6 +31,11 @@
     padding:14px 16px 6px;
   }
   header h1{font-size:15px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .home-btn{
+    background:none;border:none;padding:4px 6px 4px 0;
+    color:var(--ink);font-size:20px;line-height:1;
+    display:none;
+  }
   .header-right{display:flex;gap:8px;align-items:center}
   .gps{
     font-size:12px;font-weight:600;
@@ -332,6 +337,7 @@
 <body>
 
 <header>
+  <button class="home-btn" id="homeBtn" title="Välj bana" aria-label="Välj bana">⛳</button>
   <h1>Golfavstånd</h1>
   <div class="header-right">
     <span id="loadingSpinner" style="display:none" class="spinner"></span>
@@ -1434,6 +1440,8 @@ const _provider = new GoogleAuthProvider();
 // Hantera redirect-resultat efter återkomst från Google
 getRedirectResult(auth).catch(() => {});
 
+document.getElementById("homeBtn").addEventListener("click", showWelcomeScreen);
+
 document.getElementById("googleBtn").addEventListener("click", async () => {
   const errEl = document.getElementById("authErr");
   errEl.classList.remove("show");
@@ -1567,6 +1575,7 @@ onAuthStateChanged(auth, async user => {
     document.getElementById("authOverlay").classList.remove("open");
     document.getElementById("signOutBtn").style.display = "";
     document.getElementById("imgCameraBtn").style.display = "";
+    document.getElementById("homeBtn").style.display = "";
     await Promise.all([loadCourses(), loadStored(), loadImages()]);
     currentCourse = COURSES[0];
     currentHole   = currentCourse.holes[0].hole;
@@ -1584,6 +1593,7 @@ onAuthStateChanged(auth, async user => {
     document.getElementById("welcomeOverlay").classList.remove("open");
     document.getElementById("signOutBtn").style.display = "none";
     document.getElementById("imgCameraBtn").style.display = "none";
+    document.getElementById("homeBtn").style.display = "none";
     document.getElementById("gpsStatus").textContent = "Ingen GPS";
     document.getElementById("gpsStatus").className = "gps bad";
   }
