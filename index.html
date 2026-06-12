@@ -1563,5 +1563,10 @@ onAuthStateChanged(auth, async user => {
   }
 });
 </script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/golfavstand/sw.js');
+}
+</script>
 </body>
 </html>
