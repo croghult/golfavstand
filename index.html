@@ -226,41 +226,23 @@
     padding:4px 10px;border-radius:99px;
     border:1px solid var(--line);background:var(--card);color:var(--muted);
   }
-  /* Hålbilder */
-  .hole-img-wrap{
-    margin:0 16px 0;
-    border-radius:var(--radius) var(--radius) 0 0;
-    overflow:hidden;position:relative;
-    background:#111;
+  /* Hålbild – helbakgrund */
+  #holeBgImg{
+    position:fixed;inset:0;z-index:0;
+    background-size:cover;background-position:center;background-repeat:no-repeat;
+    pointer-events:none;display:none;
   }
-  .hole-img-wrap img{
-    width:100%;max-height:200px;
-    object-fit:cover;display:block;
+  #holeBgImg::after{
+    content:"";position:absolute;inset:0;
+    background:rgba(247,248,244,.72);
   }
-  .hole-img-actions{
-    position:absolute;top:8px;right:8px;
-    display:flex;gap:6px;
+  body.has-bg-img{background:transparent}
+  .img-camera-btn{
+    font-size:17px;background:none;border:none;
+    padding:3px 6px;opacity:.45;line-height:1;
   }
-  .hole-img-btn{
-    background:rgba(22,35,27,.6);color:#fff;
-    border:none;border-radius:99px;
-    padding:6px 12px;font-size:13px;font-weight:600;
-    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
-  }
-  .img-placeholder{
-    margin:0 16px 0;
-    padding:11px 16px;
-    border:1.5px dashed var(--line);
-    border-radius:var(--radius);
-    text-align:center;
-    font-size:13px;font-weight:600;color:var(--muted);
-    background:var(--card);cursor:pointer;
-  }
-  .readout.with-img{
-    border-radius:0 0 var(--radius) var(--radius);
-    border-top:none;margin-top:0;
-  }
-  .img-uploading{opacity:.5;pointer-events:none}
+  .img-camera-btn.has-img{opacity:1}
+  .img-uploading .img-camera-btn{opacity:.3;pointer-events:none}
   /* Kompass */
   .compass-btn{
     position:absolute;top:10px;left:10px;
@@ -300,6 +282,7 @@
 <header>
   <h1>Golfavstånd</h1>
   <div class="header-right">
+    <button class="img-camera-btn" id="imgCameraBtn" style="display:none" title="Hålbild" aria-label="Hantera hålbild">📷</button>
     <button class="sign-out-btn" id="signOutBtn" style="display:none">Logga ut</button>
     <span class="gps bad" id="gpsStatus">Ingen GPS</span>
   </div>
@@ -313,8 +296,8 @@
   </div>
 </div>
 
+<div id="holeBgImg"></div>
 <div class="holes" id="holeChips"></div>
-<div id="holeImgSection"></div>
 <div class="readout" id="readout"></div>
 <input type="file" id="imageInput" accept="image/*" style="display:none">
 
@@ -420,6 +403,18 @@
       <button class="btn-save" id="toggleShareBtn"></button>
       <button class="btn-danger" id="deleteCourseBtn">Ta bort bana</button>
       <button class="btn-cancel" id="cancelManageCourse">Stäng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sheet: hantera hålbild -->
+<div class="overlay" id="imgMgmtOverlay">
+  <div class="sheet">
+    <h3 id="imgMgmtTitle">Hålbild</h3>
+    <div class="actions col">
+      <button class="btn-save" id="replaceImgBtn">Byt bild</button>
+      <button class="btn-danger" id="removeImgBtn2">Ta bort bild</button>
+      <button class="btn-cancel" id="cancelImgMgmt">Avbryt</button>
     </div>
   </div>
 </div>
@@ -693,8 +688,8 @@ function resizeImage(file, maxPx = 1400) {
 }
 
 async function uploadHoleImage(file) {
-  const section = document.getElementById("holeImgSection");
-  section.classList.add("img-uploading");
+  document.getElementById("imgCameraBtn").style.opacity = ".3";
+  document.getElementById("imgCameraBtn").style.pointerEvents = "none";
   try {
     const blob    = await resizeImage(file);
     const path    = `users/${currentUid}/${currentCourse.id}/${currentHole}.jpg`;
@@ -706,7 +701,10 @@ async function uploadHoleImage(file) {
     await saveImages();
     renderHoleImage();
   } catch (e) { console.error("Uppladdning misslyckades:", e); }
-  finally { section.classList.remove("img-uploading"); }
+  finally {
+    const btn = document.getElementById("imgCameraBtn");
+    btn.style.opacity = ""; btn.style.pointerEvents = "";
+  }
 }
 
 async function deleteHoleImage() {
@@ -720,26 +718,19 @@ async function deleteHoleImage() {
 }
 
 function renderHoleImage() {
-  const section = document.getElementById("holeImgSection");
-  const readout = document.getElementById("readout");
+  const bg  = document.getElementById("holeBgImg");
   const url = holeImages[currentCourse.id] && holeImages[currentCourse.id][currentHole];
-  readout.classList.toggle("with-img", !!url);
+  const btn = document.getElementById("imgCameraBtn");
   if (url) {
-    section.innerHTML = `
-      <div class="hole-img-wrap">
-        <img src="${esc(url)}" alt="Hålbild hål ${currentHole}">
-        <div class="hole-img-actions">
-          <button class="hole-img-btn" id="changeImgBtn">Byt bild</button>
-          <button class="hole-img-btn" id="removeImgBtn">✕</button>
-        </div>
-      </div>`;
-    document.getElementById("changeImgBtn").addEventListener("click", () =>
-      document.getElementById("imageInput").click());
-    document.getElementById("removeImgBtn").addEventListener("click", deleteHoleImage);
+    bg.style.backgroundImage = `url("${url}")`;
+    bg.style.display = "";
+    document.body.classList.add("has-bg-img");
+    if (btn) btn.classList.add("has-img");
   } else {
-    section.innerHTML = `<div class="img-placeholder" id="addImgBtn">📷 Lägg till hålbild</div>`;
-    document.getElementById("addImgBtn").addEventListener("click", () =>
-      document.getElementById("imageInput").click());
+    bg.style.backgroundImage = "";
+    bg.style.display = "none";
+    document.body.classList.remove("has-bg-img");
+    if (btn) btn.classList.remove("has-img");
   }
 }
 
@@ -1352,12 +1343,37 @@ document.getElementById("imageInput").addEventListener("change", e => {
   e.target.value = "";
 });
 
+document.getElementById("imgCameraBtn").addEventListener("click", () => {
+  const url = holeImages[currentCourse.id] && holeImages[currentCourse.id][currentHole];
+  if (url) {
+    document.getElementById("imgMgmtTitle").textContent = `Hålbild – hål ${currentHole}`;
+    document.getElementById("imgMgmtOverlay").classList.add("open");
+  } else {
+    document.getElementById("imageInput").click();
+  }
+});
+document.getElementById("replaceImgBtn").addEventListener("click", () => {
+  document.getElementById("imgMgmtOverlay").classList.remove("open");
+  document.getElementById("imageInput").click();
+});
+document.getElementById("removeImgBtn2").addEventListener("click", async () => {
+  document.getElementById("imgMgmtOverlay").classList.remove("open");
+  await deleteHoleImage();
+});
+document.getElementById("cancelImgMgmt").addEventListener("click", () =>
+  document.getElementById("imgMgmtOverlay").classList.remove("open"));
+document.getElementById("imgMgmtOverlay").addEventListener("click", e => {
+  if (e.target === document.getElementById("imgMgmtOverlay"))
+    document.getElementById("imgMgmtOverlay").classList.remove("open");
+});
+
 /* ---- Auth-tillstånd ---- */
 onAuthStateChanged(auth, async user => {
   if (user) {
     currentUid = user.uid;
     document.getElementById("authOverlay").classList.remove("open");
     document.getElementById("signOutBtn").style.display = "";
+    document.getElementById("imgCameraBtn").style.display = "";
     await Promise.all([loadCourses(), loadStored(), loadImages()]);
     currentCourse = COURSES[0];
     currentHole   = currentCourse.holes[0].hole;
@@ -1372,6 +1388,7 @@ onAuthStateChanged(auth, async user => {
     firestoreCourses = []; COURSES = [...BASE_COURSES];
     document.getElementById("authOverlay").classList.add("open");
     document.getElementById("signOutBtn").style.display = "none";
+    document.getElementById("imgCameraBtn").style.display = "none";
     document.getElementById("gpsStatus").textContent = "Ingen GPS";
     document.getElementById("gpsStatus").className = "gps bad";
   }
