@@ -554,7 +554,8 @@ import { getAnalytics }
   from "https://www.gstatic.com/firebasejs/12.14.0/firebase-analytics.js";
 import {
   getAuth, onAuthStateChanged,
-  signInWithPopup, GoogleAuthProvider, signOut
+  signInWithPopup, signInWithRedirect, getRedirectResult,
+  GoogleAuthProvider, signOut
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache,
@@ -1405,14 +1406,22 @@ document.getElementById("compassOverlay").addEventListener("click", e => {
 });
 
 /* ---- Auth UI ---- */
+const _provider = new GoogleAuthProvider();
+
+// Hantera redirect-resultat efter återkomst från Google
+getRedirectResult(auth).catch(() => {});
+
 document.getElementById("googleBtn").addEventListener("click", async () => {
   const errEl = document.getElementById("authErr");
   errEl.classList.remove("show");
   try {
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    await signInWithPopup(auth, _provider);
   } catch (e) {
-    if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
-      errEl.textContent = "Inloggningsfel. Försök igen.";
+    if (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment") {
+      // Popup blockerad (vanligt på mobil Safari) – använd redirect istället
+      await signInWithRedirect(auth, _provider);
+    } else if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
+      errEl.textContent = `Inloggningsfel (${e.code ?? e.message}). Försök igen.`;
       errEl.classList.add("show");
     }
   }
