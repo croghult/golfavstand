@@ -1575,7 +1575,7 @@ onAuthStateChanged(auth, async user => {
     document.getElementById("authOverlay").classList.remove("open");
     document.getElementById("signOutBtn").style.display = "";
     document.getElementById("imgCameraBtn").style.display = "";
-    document.getElementById("homeBtn").style.display = "";
+    document.getElementById("homeBtn").style.display = "block";
     await Promise.all([loadCourses(), loadStored(), loadImages()]);
     currentCourse = COURSES[0];
     currentHole   = currentCourse.holes[0].hole;
