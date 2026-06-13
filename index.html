@@ -263,6 +263,24 @@
     padding:8px 16px;font-size:15px;font-weight:700;
     backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   }
+  .wind-row{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-top:12px;padding-top:10px;border-top:1px solid var(--line);
+    flex-wrap:wrap;gap:6px;
+  }
+  .wind-lbl{font-size:13px;font-weight:600;color:var(--muted)}
+  .club-rec{
+    font-size:14px;font-weight:700;color:var(--green-dark);
+    background:#E6F2EC;border-radius:99px;padding:4px 12px;
+  }
+  .club-row{
+    display:flex;align-items:center;gap:10px;
+    padding:8px 0;border-bottom:1px solid var(--line);
+  }
+  .club-row:last-child{border-bottom:none}
+  .club-row input[type=text]{flex:1;font-size:15px}
+  .club-row input[type=number]{width:72px;font-size:15px;text-align:right}
+  .club-row .club-unit{font-size:13px;color:var(--muted);white-space:nowrap}
   .google-btn{
     display:flex;align-items:center;justify-content:center;gap:10px;
     width:100%;padding:13px;
@@ -341,6 +359,7 @@
   <h1>Golfavstånd</h1>
   <div class="header-right">
     <span id="loadingSpinner" style="display:none" class="spinner"></span>
+    <button class="img-camera-btn" id="clubsBtn" style="display:none" title="Mina klubbor" aria-label="Mina klubbor">🏌️</button>
     <button class="img-camera-btn" id="imgCameraBtn" style="display:none" title="Hålbild" aria-label="Hantera hålbild">📷</button>
     <button class="sign-out-btn" id="signOutBtn" style="display:none">Logga ut</button>
     <span class="gps bad" id="gpsStatus">Ingen GPS</span>
@@ -518,6 +537,19 @@
   </div>
 </div>
 
+<!-- Sheet: mina klubbor -->
+<div class="overlay" id="clubsOverlay">
+  <div class="sheet" style="max-height:88vh;display:flex;flex-direction:column">
+    <h3>Mina klubbor</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Ange ditt typiska avstånd per klubba. Används för att rekommendera rätt klubba baserat på avstånd och vind.</p>
+    <div id="clubsList" style="overflow-y:auto;flex:1"></div>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn-cancel" id="cancelClubs">Avbryt</button>
+      <button class="btn-save" id="saveClubsBtn">Spara</button>
+    </div>
+  </div>
+</div>
+
 <!-- Välkomstskärm: välj bana -->
 <div class="overlay bg-ekerum welcome-overlay" id="welcomeOverlay">
   <div class="sheet" style="max-height:82vh;display:flex;flex-direction:column">
@@ -645,6 +677,23 @@ let currentUid    = null;
 let gpsStarted    = false;
 let deleteCourseConfirmed = false;
 let holeImages = {}; // { courseId: { holeNum: url } }
+let clubs = [];
+let windData = null;
+let windFetchedAt = 0;
+
+const DEFAULT_CLUBS = [
+  {name:"Driver",  dist:200},
+  {name:"3-trä",   dist:175},
+  {name:"5-trä",   dist:160},
+  {name:"4-järn",  dist:150},
+  {name:"5-järn",  dist:140},
+  {name:"6-järn",  dist:130},
+  {name:"7-järn",  dist:120},
+  {name:"8-järn",  dist:110},
+  {name:"9-järn",  dist:100},
+  {name:"PW",      dist:85},
+  {name:"SW",      dist:65},
+];
 
 /* ---- Hjälpfunktioner ---- */
 function haversine(a, b) {
@@ -838,6 +887,64 @@ function renderHoleImage() {
   }
 }
 
+/* ---- Klubbor: lagring ---- */
+async function loadClubs() {
+  if (!currentUid) return;
+  try {
+    const snap = await getDoc(doc(db, "users", currentUid));
+    const data = snap.exists() ? snap.data() : {};
+    clubs = data.clubs ? JSON.parse(data.clubs) : [...DEFAULT_CLUBS];
+  } catch(e) { clubs = [...DEFAULT_CLUBS]; }
+}
+async function saveClubs() {
+  if (!currentUid) return;
+  try { await setDoc(doc(db, "users", currentUid), { clubs: JSON.stringify(clubs) }, { merge: true }); }
+  catch(e) { console.error("Kunde inte spara klubbor:", e); }
+}
+
+/* ---- Vind ---- */
+async function fetchWind() {
+  if (!position || position.test) return;
+  const now = Date.now();
+  if (windData && now - windFetchedAt < 5 * 60 * 1000) return;
+  try {
+    const r = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${position.lat.toFixed(4)}&longitude=${position.lng.toFixed(4)}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&forecast_days=1`
+    );
+    const d = await r.json();
+    windData = { speed: d.current.wind_speed_10m, dir: d.current.wind_direction_10m };
+    windFetchedAt = now;
+    renderReadout();
+  } catch(e) { console.warn("Vind kunde inte hämtas:", e); }
+}
+
+function windEffectMeters(bearingToTarget) {
+  if (!windData) return 0;
+  const windTo = (windData.dir + 180) % 360;
+  const angle  = ((windTo - bearingToTarget) + 360) % 360;
+  const comp   = Math.cos(angle * Math.PI / 180); // +1=medvind, -1=motvind
+  return windData.speed * comp * (comp > 0 ? 3 : 4);
+}
+
+function windLabel(bearingToTarget) {
+  if (!windData || windData.speed < 0.5) return null;
+  const windTo = (windData.dir + 180) % 360;
+  const angle  = ((windTo - bearingToTarget) + 360) % 360;
+  const norm   = angle > 180 ? 360 - angle : angle;
+  const dir    = norm < 45 ? "medvind" : norm < 135 ? "sidvind" : "motvind";
+  const spd    = windData.speed.toFixed(1);
+  const arrows = norm < 45 ? "↓" : norm < 135 ? (((windTo - bearingToTarget + 360) % 360) < 180 ? "↙" : "↘") : "↑";
+  return `${arrows} ${spd} m/s ${dir}`;
+}
+
+function recommendClub(targetDist) {
+  const usable = clubs.filter(c => c.dist > 0);
+  if (!usable.length) return null;
+  return usable.reduce((best, c) =>
+    Math.abs(c.dist - targetDist) < Math.abs(best.dist - targetDist) ? c : best
+  );
+}
+
 let _loadingCount = 0;
 function setLoading(on) {
   _loadingCount = Math.max(0, _loadingCount + (on ? 1 : -1));
@@ -941,13 +1048,25 @@ function renderReadout() {
     const dF = fmt(haversine(position, g.front));
     const dM = fmt(haversine(position, g.middle));
     const dB = fmt(haversine(position, g.back));
+    const bearing   = bearingTo(position, g.middle);
+    const windAdj   = windEffectMeters(bearing);
+    const effDist   = Math.max(10, dM - Math.round(windAdj));
+    const club      = recommendClub(effDist);
+    const wLabel    = windLabel(bearing);
+    const windRow   = wLabel
+      ? `<div class="wind-row"><span class="wind-lbl">${wLabel}</span>${
+          club ? `<span class="club-rec">🏌️ ${esc(club.name)} (${club.dist}m)</span>` : ""
+        }</div>`
+      : club
+        ? `<div class="wind-row"><span class="club-rec">🏌️ ${esc(club.name)} (${club.dist}m)</span></div>`
+        : "";
     inner += `
       <div class="label">Hål ${currentHole} · Mitten av green</div>
       <div class="mid">${dM}<small>m</small></div>
       <div class="fb">
         <div><div class="label">Fram</div><div class="num">${dF}</div></div>
         <div><div class="label">Bak</div><div class="num">${dB}</div></div>
-      </div>`;
+      </div>${windRow}`;
   }
   el.innerHTML = inner;
 
@@ -1027,6 +1146,7 @@ function setPosition(pos) {
     s.className = "gps " + (acc <= 10 ? "good" : acc <= 25 ? "ok" : "bad");
   }
   renderReadout(); renderPois();
+  fetchWind();
 }
 function startGps() {
   if (gpsStarted || !("geolocation" in navigator)) return;
@@ -1441,6 +1561,36 @@ getRedirectResult(auth).catch(() => {});
 
 document.getElementById("homeBtn").addEventListener("click", showWelcomeScreen);
 
+/* ---- Klubb-sheet ---- */
+function openClubsSheet() {
+  const list = document.getElementById("clubsList");
+  list.innerHTML = clubs.map((c, i) => `
+    <div class="club-row">
+      <input type="text" value="${esc(c.name)}" data-i="${i}" data-field="name" style="flex:1;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)">
+      <input type="number" value="${c.dist}" min="0" max="400" data-i="${i}" data-field="dist" style="width:72px;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);text-align:right">
+      <span class="club-unit">m</span>
+    </div>`).join("");
+  document.getElementById("clubsOverlay").classList.add("open");
+}
+async function saveClubsFromSheet() {
+  document.getElementById("clubsList").querySelectorAll("input").forEach(inp => {
+    const i = Number(inp.dataset.i);
+    if (inp.dataset.field === "name") clubs[i].name = inp.value.trim() || clubs[i].name;
+    if (inp.dataset.field === "dist") clubs[i].dist = Math.max(0, Number(inp.value) || 0);
+  });
+  await saveClubs();
+  document.getElementById("clubsOverlay").classList.remove("open");
+  renderReadout();
+}
+document.getElementById("clubsBtn").addEventListener("click", openClubsSheet);
+document.getElementById("saveClubsBtn").addEventListener("click", saveClubsFromSheet);
+document.getElementById("cancelClubs").addEventListener("click", () =>
+  document.getElementById("clubsOverlay").classList.remove("open"));
+document.getElementById("clubsOverlay").addEventListener("click", e => {
+  if (e.target === document.getElementById("clubsOverlay"))
+    document.getElementById("clubsOverlay").classList.remove("open");
+});
+
 document.getElementById("googleBtn").addEventListener("click", async () => {
   const errEl = document.getElementById("authErr");
   errEl.classList.remove("show");
@@ -1575,7 +1725,8 @@ onAuthStateChanged(auth, async user => {
     document.getElementById("signOutBtn").style.display = "";
     document.getElementById("imgCameraBtn").style.display = "";
     document.getElementById("homeBtn").style.display = "block";
-    await Promise.all([loadCourses(), loadStored(), loadImages()]);
+    document.getElementById("clubsBtn").style.display = "block";
+    await Promise.all([loadCourses(), loadStored(), loadImages(), loadClubs()]);
     currentCourse = COURSES[0];
     currentHole   = currentCourse.holes[0].hole;
     renderCourseSelect();
@@ -1593,6 +1744,7 @@ onAuthStateChanged(auth, async user => {
     document.getElementById("signOutBtn").style.display = "none";
     document.getElementById("imgCameraBtn").style.display = "none";
     document.getElementById("homeBtn").style.display = "none";
+    document.getElementById("clubsBtn").style.display = "none";
     document.getElementById("gpsStatus").textContent = "Ingen GPS";
     document.getElementById("gpsStatus").className = "gps bad";
   }
