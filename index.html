@@ -541,9 +541,10 @@
 <div class="overlay" id="clubsOverlay">
   <div class="sheet" style="max-height:88vh;display:flex;flex-direction:column">
     <h3>Mina klubbor</h3>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Ange ditt typiska avstånd per klubba. Används för att rekommendera rätt klubba baserat på avstånd och vind.</p>
-    <div id="clubsList" style="overflow-y:auto;flex:1"></div>
-    <div class="actions" style="margin-top:14px">
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Bygg din bag. Avstånd och vind används för att rekommendera rätt klubba.</p>
+    <div id="clubsList" style="overflow-y:auto;flex:1;margin:0 -4px"></div>
+    <button class="btn-cancel" id="addClubBtn" style="margin-top:12px;width:100%;border-style:dashed">+ Lägg till klubba</button>
+    <div class="actions" style="margin-top:10px">
       <button class="btn-cancel" id="cancelClubs">Avbryt</button>
       <button class="btn-save" id="saveClubsBtn">Spara</button>
     </div>
@@ -1565,26 +1566,57 @@ getRedirectResult(auth).catch(() => {});
 document.getElementById("homeBtn").addEventListener("click", showWelcomeScreen);
 
 /* ---- Klubb-sheet ---- */
-function openClubsSheet() {
+let _editClubs = [];
+
+function renderClubsList() {
   const list = document.getElementById("clubsList");
-  list.innerHTML = clubs.map((c, i) => `
-    <div class="club-row">
-      <input type="text" value="${esc(c.name)}" data-i="${i}" data-field="name" style="flex:1;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)">
-      <input type="number" value="${c.dist}" min="0" max="400" data-i="${i}" data-field="dist" style="width:72px;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);text-align:right">
-      <span class="club-unit">m</span>
+  list.innerHTML = _editClubs.map((c, i) => `
+    <div class="club-row" data-i="${i}">
+      <input type="text" value="${esc(c.name)}" placeholder="Klubbnamn"
+        style="flex:1;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)">
+      <input type="number" value="${c.dist || ""}" min="1" max="400" placeholder="m"
+        style="width:68px;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);text-align:right;color:var(--ink)">
+      <button data-del="${i}" style="background:none;border:none;font-size:18px;color:var(--muted);padding:4px 6px;flex-shrink:0">✕</button>
     </div>`).join("");
+
+  list.querySelectorAll("[data-del]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _editClubs.splice(Number(btn.dataset.del), 1);
+      renderClubsList();
+    });
+  });
+}
+
+function openClubsSheet() {
+  _editClubs = clubs.map(c => ({...c}));
+  renderClubsList();
   document.getElementById("clubsOverlay").classList.add("open");
 }
-async function saveClubsFromSheet() {
-  document.getElementById("clubsList").querySelectorAll("input").forEach(inp => {
-    const i = Number(inp.dataset.i);
-    if (inp.dataset.field === "name") clubs[i].name = inp.value.trim() || clubs[i].name;
-    if (inp.dataset.field === "dist") clubs[i].dist = Math.max(0, Number(inp.value) || 0);
+
+function collectClubsFromSheet() {
+  _editClubs = [];
+  document.getElementById("clubsList").querySelectorAll(".club-row").forEach(row => {
+    const name = row.querySelector("input[type=text]").value.trim();
+    const dist = parseInt(row.querySelector("input[type=number]").value, 10);
+    if (name && dist > 0) _editClubs.push({name, dist});
   });
+}
+
+async function saveClubsFromSheet() {
+  collectClubsFromSheet();
+  clubs = _editClubs;
   await saveClubs();
   document.getElementById("clubsOverlay").classList.remove("open");
   renderReadout();
 }
+
+document.getElementById("addClubBtn").addEventListener("click", () => {
+  collectClubsFromSheet();
+  _editClubs.push({name: "", dist: 0});
+  renderClubsList();
+  const rows = document.getElementById("clubsList").querySelectorAll(".club-row");
+  rows[rows.length - 1].querySelector("input").focus();
+});
 document.getElementById("clubsBtn").addEventListener("click", openClubsSheet);
 document.getElementById("clubsBtnWelcome").addEventListener("click", openClubsSheet);
 document.getElementById("saveClubsBtn").addEventListener("click", saveClubsFromSheet);
