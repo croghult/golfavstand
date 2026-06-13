@@ -553,7 +553,10 @@
 <!-- Välkomstskärm: välj bana -->
 <div class="overlay bg-ekerum welcome-overlay" id="welcomeOverlay">
   <div class="sheet" style="max-height:82vh;display:flex;flex-direction:column">
-    <h3 style="margin-bottom:14px">Välj bana att spela</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3>Välj bana att spela</h3>
+      <button class="img-camera-btn" style="opacity:1;font-size:20px" id="clubsBtnWelcome" title="Mina klubbor" aria-label="Mina klubbor">🏌️</button>
+    </div>
     <div class="seg-ctrl" id="courseFilterToggle">
       <button class="seg-btn active" data-filter="all">Alla banor</button>
       <button class="seg-btn" data-filter="mine">Mina banor</button>
@@ -1583,6 +1586,7 @@ async function saveClubsFromSheet() {
   renderReadout();
 }
 document.getElementById("clubsBtn").addEventListener("click", openClubsSheet);
+document.getElementById("clubsBtnWelcome").addEventListener("click", openClubsSheet);
 document.getElementById("saveClubsBtn").addEventListener("click", saveClubsFromSheet);
 document.getElementById("cancelClubs").addEventListener("click", () =>
   document.getElementById("clubsOverlay").classList.remove("open"));
