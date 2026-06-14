@@ -554,6 +554,9 @@
 <!-- Välkomstskärm: välj bana -->
 <div class="overlay bg-ekerum welcome-overlay" id="welcomeOverlay">
   <div class="sheet" style="max-height:82vh;display:flex;flex-direction:column">
+    <div style="text-align:center;margin-bottom:10px">
+      <h2 style="color:#000;font-weight:700;letter-spacing:0.5px;margin:0">Roghult Rangefinder</h2>
+    </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <h3>Välj bana att spela</h3>
       <button class="img-camera-btn" style="opacity:1;font-size:20px" id="clubsBtnWelcome" title="Mina klubbor" aria-label="Mina klubbor">🏌️</button>
@@ -1736,6 +1739,7 @@ function renderCoursePicker() {
       currentCourse = course;
       currentHole   = course.holes[0].hole;
       hideWelcomeScreen();
+      startGps();
       renderCourseSelect();
       renderHoleChips();
       renderReadout();
@@ -1769,7 +1773,6 @@ onAuthStateChanged(auth, async user => {
     renderHoleChips();
     renderReadout();
     renderPois();
-    startGps();
     showWelcomeScreen();
   } else {
     currentUid = null;
