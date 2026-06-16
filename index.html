@@ -371,8 +371,7 @@
 <div class="course-row">
   <div class="course-row-inner">
     <select id="courseSelect"></select>
-    <button class="icon-btn" id="newCourseBtn" title="Ny bana" aria-label="Ny bana">+</button>
-    <button class="icon-btn" id="manageCourseBtn" title="Hantera bana" aria-label="Hantera bana" style="display:none">⚙</button>
+<button class="icon-btn" id="manageCourseBtn" title="Hantera bana" aria-label="Hantera bana" style="display:none">⚙</button>
   </div>
 </div>
 
@@ -1395,7 +1394,6 @@ document.getElementById("courseSelect").addEventListener("change", e => {
   renderHoleChips(); renderReadout(); renderPois();
 });
 
-document.getElementById("newCourseBtn").addEventListener("click", openNewCourseSheet);
 document.getElementById("manageCourseBtn").addEventListener("click", openManageCourseSheet);
 
 document.getElementById("savePrivateCourse").addEventListener("click", () => saveNewCourse(false));
