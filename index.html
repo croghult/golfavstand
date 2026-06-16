@@ -218,6 +218,7 @@
   /* Välkomstskärm */
   .welcome-overlay{z-index:18}
   #clubsOverlay{z-index:19}
+  #newCourseOverlay{z-index:19}
   .seg-ctrl{
     display:flex;background:var(--bg);
     border-radius:10px;padding:3px;
@@ -567,7 +568,8 @@
       <button class="seg-btn" data-filter="mine">Mina banor</button>
     </div>
     <div class="course-picker-list" id="coursePickerList"></div>
-    <button id="signOutWelcomeBtn" style="margin-top:14px;width:100%;padding:10px;background:none;border:1px solid #ccc;border-radius:8px;font-size:14px;color:#555;cursor:pointer">Logga ut</button>
+    <button id="newCourseWelcomeBtn" style="margin-top:14px;width:100%;padding:10px;background:none;border:1px solid #ccc;border-radius:8px;font-size:14px;color:#333;cursor:pointer">+ Ny bana</button>
+    <button id="signOutWelcomeBtn" style="margin-top:8px;width:100%;padding:10px;background:none;border:1px solid #ccc;border-radius:8px;font-size:14px;color:#555;cursor:pointer">Logga ut</button>
   </div>
 </div>
 
@@ -1652,6 +1654,7 @@ document.getElementById("googleBtn").addEventListener("click", async () => {
 });
 document.getElementById("signOutBtn").addEventListener("click", () => signOut(auth));
 document.getElementById("signOutWelcomeBtn").addEventListener("click", () => signOut(auth));
+document.getElementById("newCourseWelcomeBtn").addEventListener("click", openNewCourseSheet);
 
 document.getElementById("imageInput").addEventListener("change", e => {
   const file = e.target.files[0];
