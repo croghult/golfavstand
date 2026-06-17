@@ -1943,7 +1943,7 @@ function navigateToCourse(course, withRound) {
 function updateScoreChip() {
   const chip = document.getElementById("scoreChip");
   if (!activeRound) { chip.style.display = "none"; return; }
-  chip.style.display = "";
+  chip.style.display = "block";
   let totalStrokes = 0, totalPar = 0, played = 0;
   activeRound.holes.forEach(h => {
     if (h.strokes > 0) { totalStrokes += h.strokes; totalPar += (h.par || 0); played++; }
