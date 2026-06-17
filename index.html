@@ -643,6 +643,9 @@
     </div>
     <div id="roundDetailMeta" style="font-size:13px;color:var(--muted);margin-bottom:14px"></div>
     <div id="roundDetailContent" style="overflow-y:auto;flex:1"></div>
+    <div style="padding-top:12px;border-top:1px solid var(--line);margin-top:8px">
+      <button class="btn-danger" id="deleteRoundBtn" style="width:100%;padding:12px;font-size:15px">Ta bort runda</button>
+    </div>
   </div>
 </div>
 
@@ -1800,6 +1803,24 @@ document.getElementById("closeRoundHistory").addEventListener("click", () =>
   document.getElementById("roundHistoryOverlay").classList.remove("open"));
 document.getElementById("closeRoundDetail").addEventListener("click", () =>
   document.getElementById("roundDetailOverlay").classList.remove("open"));
+document.getElementById("deleteRoundBtn").addEventListener("click", async function() {
+  const docId = this.dataset.docId;
+  if (!docId) return;
+  if (this.textContent !== "Är du säker?") {
+    this.textContent = "Är du säker?";
+    setTimeout(() => { if (this.textContent === "Är du säker?") this.textContent = "Ta bort runda"; }, 3000);
+    return;
+  }
+  this.textContent = "Tar bort…"; this.disabled = true;
+  try {
+    await deleteDoc(doc(db, "rounds", docId));
+    document.getElementById("roundDetailOverlay").classList.remove("open");
+    openRoundHistory();
+  } catch(e) {
+    console.error("Kunde inte radera runda:", e);
+    this.textContent = "Ta bort runda"; this.disabled = false;
+  }
+});
 document.getElementById("roundDetailOverlay").addEventListener("click", e => {
   if (e.target === document.getElementById("roundDetailOverlay"))
     document.getElementById("roundDetailOverlay").classList.remove("open");
@@ -2066,7 +2087,7 @@ async function loadRounds() {
       collection(db, "rounds"),
       where("userId", "==", currentUid)
     ));
-    return snap.docs.map(d => d.data()).sort((a, b) => b.date.localeCompare(a.date));
+    return snap.docs.map(d => ({ ...d.data(), _docId: d.id })).sort((a, b) => b.date.localeCompare(a.date));
   } catch(e) { console.error("Kunde inte ladda rundor:", e); return []; }
 }
 
@@ -2136,6 +2157,9 @@ function openRoundDetail(r) {
       <tbody>${rows}</tbody>
     </table>`;
 
+  document.getElementById("deleteRoundBtn").dataset.docId = r._docId || "";
+  document.getElementById("deleteRoundBtn").textContent = "Ta bort runda";
+  document.getElementById("deleteRoundBtn").disabled = false;
   document.getElementById("roundDetailOverlay").classList.add("open");
 }
 
