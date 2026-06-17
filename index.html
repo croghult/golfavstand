@@ -2045,10 +2045,9 @@ async function loadRounds() {
   try {
     const snap = await getDocs(query(
       collection(db, "rounds"),
-      where("userId", "==", currentUid),
-      orderBy("date", "desc")
+      where("userId", "==", currentUid)
     ));
-    return snap.docs.map(d => d.data());
+    return snap.docs.map(d => d.data()).sort((a, b) => b.date.localeCompare(a.date));
   } catch(e) { console.error("Kunde inte ladda rundor:", e); return []; }
 }
 
