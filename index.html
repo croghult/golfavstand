@@ -222,6 +222,7 @@
   #startRoundOverlay{z-index:19}
   #scorecardOverlay{z-index:19}
   #roundHistoryOverlay{z-index:19}
+  #roundDetailOverlay{z-index:20}
   .seg-ctrl{
     display:flex;background:var(--bg);
     border-radius:10px;padding:3px;
@@ -630,6 +631,18 @@
       <button class="inline-btn" style="margin:0" id="closeRoundHistory">✕</button>
     </div>
     <div id="roundHistoryList" style="overflow-y:auto;flex:1"></div>
+  </div>
+</div>
+
+<!-- Runddetalj -->
+<div class="overlay" id="roundDetailOverlay">
+  <div class="sheet" style="max-height:92vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h3 style="margin:0" id="roundDetailTitle"></h3>
+      <button class="inline-btn" style="margin:0" id="closeRoundDetail">✕</button>
+    </div>
+    <div id="roundDetailMeta" style="font-size:13px;color:var(--muted);margin-bottom:14px"></div>
+    <div id="roundDetailContent" style="overflow-y:auto;flex:1"></div>
   </div>
 </div>
 
@@ -1785,6 +1798,12 @@ document.getElementById("newCourseWelcomeBtn").addEventListener("click", openNew
 document.getElementById("myRoundsBtn").addEventListener("click", openRoundHistory);
 document.getElementById("closeRoundHistory").addEventListener("click", () =>
   document.getElementById("roundHistoryOverlay").classList.remove("open"));
+document.getElementById("closeRoundDetail").addEventListener("click", () =>
+  document.getElementById("roundDetailOverlay").classList.remove("open"));
+document.getElementById("roundDetailOverlay").addEventListener("click", e => {
+  if (e.target === document.getElementById("roundDetailOverlay"))
+    document.getElementById("roundDetailOverlay").classList.remove("open");
+});
 document.getElementById("roundHistoryOverlay").addEventListener("click", e => {
   if (e.target === document.getElementById("roundHistoryOverlay"))
     document.getElementById("roundHistoryOverlay").classList.remove("open");
@@ -2061,21 +2080,63 @@ async function openRoundHistory() {
     list.innerHTML = '<div class="rounds-empty">Inga sparade rundor ännu.</div>';
     return;
   }
-  list.innerHTML = rounds.map(r => {
-    const d    = new Date(r.date);
+  list.innerHTML = rounds.map((r, i) => {
+    const d       = new Date(r.date);
     const dateStr = d.toLocaleDateString("sv-SE", { day:"numeric", month:"short", year:"numeric" });
-    const diff = r.totalPar > 0 ? r.totalStrokes - r.totalPar : null;
+    const diff    = r.totalPar > 0 ? r.totalStrokes - r.totalPar : null;
     const scoreStr = diff === null ? `${r.totalStrokes}` :
                      diff === 0   ? "E" :
                      diff > 0     ? `+${diff}` : `${diff}`;
-    return `<div class="round-item">
+    return `<div class="round-item" data-idx="${i}">
       <div class="round-item-info">
         <div class="round-item-name">${esc(r.courseName)}</div>
         <div class="round-item-meta">${dateStr} · ${r.totalStrokes} slag${r.totalPar ? ` · Par ${r.totalPar}` : ""}</div>
       </div>
-      <div class="round-item-score">${scoreStr}</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="round-item-score">${scoreStr}</div>
+        <i class="ti ti-chevron-right" style="font-size:18px;color:var(--muted)" aria-hidden="true"></i>
+      </div>
     </div>`;
   }).join("");
+
+  list.querySelectorAll(".round-item").forEach(el => {
+    el.addEventListener("click", () => openRoundDetail(rounds[Number(el.dataset.idx)]));
+  });
+}
+
+function openRoundDetail(r) {
+  const d       = new Date(r.date);
+  const dateStr = d.toLocaleDateString("sv-SE", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+  const diff    = r.totalPar > 0 ? r.totalStrokes - r.totalPar : null;
+  const diffStr = diff === null ? "" : diff === 0 ? " (E)" : diff > 0 ? ` (+${diff})` : ` (${diff})`;
+
+  document.getElementById("roundDetailTitle").textContent = r.courseName;
+  document.getElementById("roundDetailMeta").textContent  =
+    `${dateStr} · ${r.totalStrokes} slag${diffStr}`;
+
+  const rows = (r.holes || []).map(h => {
+    const rel = h.par && h.strokes ? h.strokes - h.par : null;
+    const relLabel = rel === null ? "" :
+      rel <= -2 ? '<span class="sc-rel eagle">Eagle</span>' :
+      rel === -1 ? '<span class="sc-rel birdie">Birdie</span>' :
+      rel === 0  ? '<span class="sc-rel par">Par</span>' :
+      rel === 1  ? '<span class="sc-rel bogey">Bogey</span>' :
+                   `<span class="sc-rel multi">+${rel}</span>`;
+    return `<tr>
+      <td><strong>${h.hole}</strong></td>
+      <td>${h.par || "–"}</td>
+      <td style="font-weight:700">${h.strokes || "–"}</td>
+      <td>${relLabel}</td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("roundDetailContent").innerHTML = `
+    <table class="sc-table">
+      <thead><tr><th>Hål</th><th>Par</th><th>Slag</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  document.getElementById("roundDetailOverlay").classList.add("open");
 }
 
 document.getElementById("courseFilterToggle").addEventListener("click", e => {
