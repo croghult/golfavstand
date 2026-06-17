@@ -219,6 +219,9 @@
   .welcome-overlay{z-index:18}
   #clubsOverlay{z-index:19}
   #newCourseOverlay{z-index:19}
+  #startRoundOverlay{z-index:19}
+  #scorecardOverlay{z-index:19}
+  #roundHistoryOverlay{z-index:19}
   .seg-ctrl{
     display:flex;background:var(--bg);
     border-radius:10px;padding:3px;
@@ -352,6 +355,37 @@
   }
   .status-tag.private{background:#F0F4F1;color:var(--muted)}
   .status-tag.shared{background:#E6F2EC;color:var(--green-dark)}
+  /* Score chip */
+  .score-chip{
+    position:fixed;bottom:80px;right:16px;
+    background:var(--green);color:#fff;border:none;
+    border-radius:99px;padding:10px 20px;
+    font-size:15px;font-weight:700;
+    box-shadow:0 2px 10px rgba(0,0,0,.28);
+    display:none;z-index:9;cursor:pointer;
+  }
+  /* Scorekort */
+  .sc-table{width:100%;border-collapse:collapse;font-size:14px}
+  .sc-table th{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 4px;text-align:center}
+  .sc-table th:first-child,.sc-table td:first-child{text-align:left;padding-left:0}
+  .sc-table td{padding:7px 4px;text-align:center;border-top:1px solid var(--line)}
+  .sc-btns{display:flex;align-items:center;justify-content:center;gap:6px}
+  .sc-btn{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--bg);font-size:16px;font-weight:700;color:var(--ink);line-height:1;padding:0;flex-shrink:0}
+  .sc-val{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;min-width:22px;text-align:center;display:inline-block}
+  .sc-rel{font-size:11px;font-weight:700;padding:2px 5px;border-radius:5px}
+  .sc-rel.eagle,.sc-rel.albatross{background:#FEE2DC;color:var(--red)}
+  .sc-rel.birdie{background:#E6F2EC;color:var(--green-dark)}
+  .sc-rel.par{color:var(--muted)}
+  .sc-rel.bogey{background:#F5F0E8;color:#8A6A1F}
+  .sc-rel.multi{background:#FEE2DC;color:var(--red)}
+  /* Rundrhistorik */
+  .round-item{background:var(--bg);border-radius:var(--radius);padding:14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer}
+  .round-item:active{opacity:.7}
+  .round-item-info{flex:1;min-width:0}
+  .round-item-name{font-size:15px;font-weight:700;color:var(--ink)}
+  .round-item-meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .round-item-score{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .rounds-empty{text-align:center;color:var(--muted);font-size:14px;padding:32px 0}
 </style>
 </head>
 <body>
@@ -388,6 +422,8 @@
 <div class="add-bar">
   <button id="addPoiBtn">Lägg till markering</button>
 </div>
+
+<button class="score-chip" id="scoreChip"></button>
 
 <!-- Sheet: markering -->
 <div class="overlay" id="poiOverlay">
@@ -432,6 +468,11 @@
         <div><label>Longitud</label><input id="gBackLng" type="text" inputmode="decimal"></div>
       </div>
       <div class="hint">Klistra gärna in hela koordinatparet från Google Maps i ett latitud-fält så fylls båda fälten i.</div>
+      <div class="group-label">Hålinfo</div>
+      <div class="coord-grid">
+        <div><label for="gPar">Par</label><input id="gPar" type="number" min="3" max="6" placeholder="3–6"></div>
+        <div><label for="gIndex">Index</label><input id="gIndex" type="number" min="1" max="18" placeholder="1–18"></div>
+      </div>
       <button class="inline-btn" id="showCodeBtn">Visa banans data som kod</button>
       <div class="err" id="greenErr"></div>
       <div class="actions">
@@ -538,17 +579,57 @@
   </div>
 </div>
 
-<!-- Sheet: mina klubbor -->
+<!-- Sheet: spelarprofil -->
 <div class="overlay" id="clubsOverlay">
   <div class="sheet" style="max-height:88vh;display:flex;flex-direction:column">
-    <h3>Mina klubbor</h3>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Bygg din bag. Avstånd och vind används för att rekommendera rätt klubba.</p>
+    <h3>Min profil</h3>
+    <label for="handicapInput">Handicap (HCP)</label>
+    <input id="handicapInput" type="number" min="-10" max="54" step="0.1" placeholder="T.ex. 18.4" style="margin-bottom:16px">
+    <p style="font-size:13px;color:var(--muted);margin-bottom:10px">Min bag – avstånd och vind används för att rekommendera rätt klubba.</p>
     <div id="clubsList" style="overflow-y:auto;flex:1;margin:0 -4px"></div>
     <button class="btn-cancel" id="addClubBtn" style="margin-top:12px;width:100%;border-style:dashed">+ Lägg till klubba</button>
     <div class="actions" style="margin-top:10px">
       <button class="btn-cancel" id="cancelClubs">Avbryt</button>
       <button class="btn-save" id="saveClubsBtn">Spara</button>
     </div>
+  </div>
+</div>
+
+<!-- Dialog: starta runda -->
+<div class="overlay" id="startRoundOverlay">
+  <div class="sheet">
+    <h3 id="startRoundTitle">Starta runda</h3>
+    <p id="startRoundSubtitle" style="font-size:14px;color:var(--muted);margin-bottom:20px"></p>
+    <div class="actions col">
+      <button class="btn-save" id="startRoundYes">🏆 Starta runda med scoring</button>
+      <button class="btn-cancel" id="startRoundNo">Bara rangefinder</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scorekort -->
+<div class="overlay" id="scorecardOverlay">
+  <div class="sheet" style="max-height:92vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3 style="margin:0" id="scorecardTitle">Scorekort</h3>
+      <button class="inline-btn" style="margin:0" id="closeScorecard">✕</button>
+    </div>
+    <div id="scorecardContent" style="overflow-y:auto;flex:1"></div>
+    <div style="padding-top:12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+      <div id="scorecardTotals" style="font-size:14px;color:var(--muted);font-weight:600"></div>
+      <button class="btn-danger" id="finishRoundBtn" style="padding:10px 18px;font-size:14px;flex-shrink:0">Avsluta runda</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rundhistorik -->
+<div class="overlay" id="roundHistoryOverlay">
+  <div class="sheet" style="max-height:88vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="margin:0">Mina rundor</h3>
+      <button class="inline-btn" style="margin:0" id="closeRoundHistory">✕</button>
+    </div>
+    <div id="roundHistoryList" style="overflow-y:auto;flex:1"></div>
   </div>
 </div>
 
@@ -568,6 +649,7 @@
     </div>
     <div class="course-picker-list" id="coursePickerList"></div>
     <button id="newCourseWelcomeBtn" style="margin-top:14px;width:100%;padding:10px;background:none;border:1px solid #ccc;border-radius:8px;font-size:14px;color:#333;cursor:pointer">+ Ny bana</button>
+    <button id="myRoundsBtn" style="margin-top:8px;width:100%;padding:10px;background:none;border:1px solid #ccc;border-radius:8px;font-size:14px;color:#333;cursor:pointer">🏆 Mina rundor</button>
     <button id="signOutWelcomeBtn" style="margin-top:8px;width:100%;padding:10px;background:none;border:1px solid #ccc;border-radius:8px;font-size:14px;color:#555;cursor:pointer">Logga ut</button>
   </div>
 </div>
@@ -624,7 +706,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache,
-  doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where
+  doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 import {
   getStorage, ref, uploadBytes, getDownloadURL, deleteObject
@@ -693,6 +775,10 @@ let holeImages = {}; // { courseId: { holeNum: url } }
 let clubs = [];
 let windData = null;
 let windFetchedAt = 0;
+let playerHandicap = null;
+let holeDetails = {};
+let activeRound = null;
+let _pendingCourse = null;
 
 const DEFAULT_CLUBS = [
   {name:"Driver",  dist:200},
@@ -906,13 +992,34 @@ async function loadClubs() {
   try {
     const snap = await getDoc(doc(db, "users", currentUid));
     const data = snap.exists() ? snap.data() : {};
-    clubs = data.clubs ? JSON.parse(data.clubs) : [...DEFAULT_CLUBS];
-  } catch(e) { clubs = [...DEFAULT_CLUBS]; }
+    clubs          = data.clubs    ? JSON.parse(data.clubs) : [...DEFAULT_CLUBS];
+    playerHandicap = data.handicap != null ? data.handicap : null;
+  } catch(e) { clubs = [...DEFAULT_CLUBS]; playerHandicap = null; }
 }
 async function saveClubs() {
   if (!currentUid) return;
-  try { await setDoc(doc(db, "users", currentUid), { clubs: JSON.stringify(clubs) }, { merge: true }); }
+  try {
+    await setDoc(doc(db, "users", currentUid), {
+      clubs: JSON.stringify(clubs),
+      handicap: playerHandicap
+    }, { merge: true });
+  }
   catch(e) { console.error("Kunde inte spara klubbor:", e); }
+}
+
+function getHolePar(courseId, holeNum) {
+  if (holeDetails[courseId] && holeDetails[courseId][holeNum] && holeDetails[courseId][holeNum].par)
+    return holeDetails[courseId][holeNum].par;
+  const course = COURSES.find(c => c.id === courseId);
+  const hole   = course && course.holes.find(h => h.hole === holeNum);
+  return (hole && hole.par) || 0;
+}
+function getHoleIndex(courseId, holeNum) {
+  if (holeDetails[courseId] && holeDetails[courseId][holeNum] && holeDetails[courseId][holeNum].index)
+    return holeDetails[courseId][holeNum].index;
+  const course = COURSES.find(c => c.id === courseId);
+  const hole   = course && course.holes.find(h => h.hole === holeNum);
+  return (hole && hole.index) || holeNum;
 }
 
 /* ---- Vind ---- */
@@ -971,9 +1078,15 @@ async function loadStored() {
   try {
     const snap = await getDoc(doc(db, "users", currentUid));
     const data = snap.exists() ? snap.data() : {};
-    pois       = data.pois   ? JSON.parse(data.pois)   : {};
-    greenEdits = data.greens ? JSON.parse(data.greens) : {};
-  } catch (e) { pois = {}; greenEdits = {}; }
+    pois        = data.pois         ? JSON.parse(data.pois)         : {};
+    greenEdits  = data.greens       ? JSON.parse(data.greens)       : {};
+    holeDetails = data.holeDetails  ? JSON.parse(data.holeDetails)  : {};
+  } catch (e) { pois = {}; greenEdits = {}; holeDetails = {}; }
+}
+async function saveHoleDetails() {
+  if (!currentUid) return;
+  try { await setDoc(doc(db, "users", currentUid), { holeDetails: JSON.stringify(holeDetails) }, { merge: true }); }
+  catch (e) { console.error("Kunde inte spara håldata:", e); }
 }
 async function savePois() {
   if (!currentUid) return;
@@ -1032,6 +1145,7 @@ function renderHoleChips() {
     btn.addEventListener("click", () => {
       currentHole = Number(btn.dataset.hole);
       renderHoleChips(); renderReadout(); renderPois();
+      updateScoreChip();
     });
   });
 }
@@ -1073,8 +1187,10 @@ function renderReadout() {
       : club
         ? `<div class="wind-row"><span class="club-rec">🏌️ ${esc(club.name)} (${club.dist}m)</span></div>`
         : "";
+    const holePar = getHolePar(currentCourse.id, currentHole);
+    const parStr  = holePar ? ` · Par ${holePar}` : "";
     inner += `
-      <div class="label">Hål ${currentHole} · Mitten av green</div>
+      <div class="label">Hål ${currentHole}${parStr} · Mitten av green</div>
       <div class="mid">${dM}<small>m</small></div>
       <div class="fb">
         <div><div class="label">Fram</div><div class="num">${dF}</div></div>
@@ -1251,6 +1367,9 @@ function openGreenSheet() {
     ln.value = (g && g[part]) ? g[part].lng.toFixed(6) : "";
     la.classList.remove("invalid"); ln.classList.remove("invalid");
   }
+  const det = holeDetails[currentCourse.id] && holeDetails[currentCourse.id][currentHole];
+  document.getElementById("gPar").value   = det && det.par   ? det.par   : "";
+  document.getElementById("gIndex").value = det && det.index ? det.index : "";
   // Visa "koda"-knappen bara för hårdkodade banor
   document.getElementById("showCodeBtn").style.display =
     getFirestoreCourse(currentCourse.id) ? "none" : "";
@@ -1271,13 +1390,20 @@ async function saveGreenFromSheet() {
     result[part] = coord;
   }
   if (isOwnFirestoreCourse(currentCourse.id)) {
-    // Ägaren sparar direkt i banans data
     await updateCourseGreen(currentCourse.id, currentHole, result);
   } else {
-    // Sparar som personlig override
     if (!greenEdits[currentCourse.id]) greenEdits[currentCourse.id] = {};
     greenEdits[currentCourse.id][currentHole] = result;
     saveGreenEdits();
+  }
+  const par = parseInt(document.getElementById("gPar").value);
+  const idx = parseInt(document.getElementById("gIndex").value);
+  if ((par >= 3 && par <= 6) || (idx >= 1 && idx <= 18)) {
+    if (!holeDetails[currentCourse.id]) holeDetails[currentCourse.id] = {};
+    if (!holeDetails[currentCourse.id][currentHole]) holeDetails[currentCourse.id][currentHole] = {};
+    if (par >= 3 && par <= 6) holeDetails[currentCourse.id][currentHole].par   = par;
+    if (idx >= 1 && idx <= 18) holeDetails[currentCourse.id][currentHole].index = idx;
+    saveHoleDetails();
   }
   closeGreenSheet(); renderReadout();
 }
@@ -1597,6 +1723,7 @@ function renderClubsList() {
 
 function openClubsSheet() {
   _editClubs = clubs.map(c => ({...c}));
+  document.getElementById("handicapInput").value = playerHandicap != null ? playerHandicap : "";
   renderClubsList();
   document.getElementById("clubsOverlay").classList.add("open");
 }
@@ -1613,6 +1740,8 @@ function collectClubsFromSheet() {
 async function saveClubsFromSheet() {
   collectClubsFromSheet();
   clubs = _editClubs;
+  const hcpVal = parseFloat(document.getElementById("handicapInput").value);
+  playerHandicap = isFinite(hcpVal) ? hcpVal : null;
   await saveClubs();
   document.getElementById("clubsOverlay").classList.remove("open");
   renderReadout();
@@ -1653,6 +1782,38 @@ document.getElementById("googleBtn").addEventListener("click", async () => {
 document.getElementById("signOutBtn").addEventListener("click", () => signOut(auth));
 document.getElementById("signOutWelcomeBtn").addEventListener("click", () => signOut(auth));
 document.getElementById("newCourseWelcomeBtn").addEventListener("click", openNewCourseSheet);
+document.getElementById("myRoundsBtn").addEventListener("click", openRoundHistory);
+document.getElementById("closeRoundHistory").addEventListener("click", () =>
+  document.getElementById("roundHistoryOverlay").classList.remove("open"));
+document.getElementById("roundHistoryOverlay").addEventListener("click", e => {
+  if (e.target === document.getElementById("roundHistoryOverlay"))
+    document.getElementById("roundHistoryOverlay").classList.remove("open");
+});
+
+document.getElementById("startRoundYes").addEventListener("click", () => {
+  document.getElementById("startRoundOverlay").classList.remove("open");
+  if (_pendingCourse) { navigateToCourse(_pendingCourse, true); _pendingCourse = null; }
+});
+document.getElementById("startRoundNo").addEventListener("click", () => {
+  document.getElementById("startRoundOverlay").classList.remove("open");
+  if (_pendingCourse) { navigateToCourse(_pendingCourse, false); _pendingCourse = null; }
+});
+document.getElementById("startRoundOverlay").addEventListener("click", e => {
+  if (e.target === document.getElementById("startRoundOverlay"))
+    document.getElementById("startRoundOverlay").classList.remove("open");
+});
+
+document.getElementById("scoreChip").addEventListener("click", () => {
+  renderScorecard();
+  document.getElementById("scorecardOverlay").classList.add("open");
+});
+document.getElementById("closeScorecard").addEventListener("click", () =>
+  document.getElementById("scorecardOverlay").classList.remove("open"));
+document.getElementById("scorecardOverlay").addEventListener("click", e => {
+  if (e.target === document.getElementById("scorecardOverlay"))
+    document.getElementById("scorecardOverlay").classList.remove("open");
+});
+document.getElementById("finishRoundBtn").addEventListener("click", finishRound);
 
 document.getElementById("imageInput").addEventListener("change", e => {
   const file = e.target.files[0];
@@ -1743,16 +1904,179 @@ function renderCoursePicker() {
     btn.addEventListener("click", () => {
       const course = COURSES.find(c => c.id === btn.dataset.id);
       if (!course) return;
-      currentCourse = course;
-      currentHole   = course.holes[0].hole;
-      hideWelcomeScreen();
-      startGps();
-      renderCourseSelect();
-      renderHoleChips();
-      renderReadout();
-      renderPois();
+      _pendingCourse = course;
+      document.getElementById("startRoundTitle").textContent = esc(course.name);
+      document.getElementById("startRoundSubtitle").textContent =
+        `${course.holes.length} hål · Vill du starta en ny runda med scoring?`;
+      document.getElementById("startRoundOverlay").classList.add("open");
     });
   });
+}
+
+/* ---- Runda ---- */
+function navigateToCourse(course, withRound) {
+  currentCourse = course;
+  currentHole   = course.holes[0].hole;
+  hideWelcomeScreen();
+  startGps();
+  renderCourseSelect();
+  renderHoleChips();
+  renderReadout();
+  renderPois();
+  if (withRound) {
+    activeRound = {
+      courseId:   course.id,
+      courseName: course.name,
+      date:       new Date().toISOString(),
+      holes: course.holes.map(h => ({
+        hole:    h.hole,
+        par:     getHolePar(course.id, h.hole),
+        strokes: 0
+      }))
+    };
+  } else {
+    activeRound = null;
+  }
+  updateScoreChip();
+}
+
+function updateScoreChip() {
+  const chip = document.getElementById("scoreChip");
+  if (!activeRound) { chip.style.display = "none"; return; }
+  chip.style.display = "";
+  let totalStrokes = 0, totalPar = 0, played = 0;
+  activeRound.holes.forEach(h => {
+    if (h.strokes > 0) { totalStrokes += h.strokes; totalPar += (h.par || 0); played++; }
+  });
+  const diff    = totalPar > 0 ? totalStrokes - totalPar : null;
+  const diffStr = diff === null ? `${totalStrokes} slag` :
+                  diff === 0   ? "E" :
+                  diff > 0     ? `+${diff}` : `${diff}`;
+  chip.textContent = `🏆 ${diffStr} · Hål ${currentHole}`;
+}
+
+function scoreLabel(strokes, par) {
+  if (!par || strokes === 0) return "";
+  const d = strokes - par;
+  if (d <= -2) return '<span class="sc-rel eagle">Eagle</span>';
+  if (d === -1) return '<span class="sc-rel birdie">Birdie</span>';
+  if (d === 0)  return '<span class="sc-rel par">Par</span>';
+  if (d === 1)  return '<span class="sc-rel bogey">Bogey</span>';
+  if (d === 2)  return '<span class="sc-rel multi">+2</span>';
+  return `<span class="sc-rel multi">+${d}</span>`;
+}
+
+function renderScorecard() {
+  if (!activeRound) return;
+  document.getElementById("scorecardTitle").textContent = activeRound.courseName;
+  const content = document.getElementById("scorecardContent");
+  let totalStrokes = 0, totalPar = 0;
+  const rows = activeRound.holes.map(h => {
+    totalStrokes += h.strokes;
+    if (h.par) totalPar += h.par;
+    const active = h.hole === currentHole ? ' style="background:var(--bg)"' : "";
+    return `<tr${active}>
+      <td><strong>${h.hole}</strong></td>
+      <td>${h.par || "–"}</td>
+      <td>${getHoleIndex(activeRound.courseId, h.hole)}</td>
+      <td>
+        <div class="sc-btns">
+          <button class="sc-btn" data-hole="${h.hole}" data-delta="-1">−</button>
+          <span class="sc-val">${h.strokes || "–"}</span>
+          <button class="sc-btn" data-hole="${h.hole}" data-delta="1">+</button>
+        </div>
+      </td>
+      <td>${scoreLabel(h.strokes, h.par)}</td>
+    </tr>`;
+  }).join("");
+  content.innerHTML = `
+    <table class="sc-table">
+      <thead><tr>
+        <th>Hål</th><th>Par</th><th>Idx</th><th>Slag</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  content.querySelectorAll(".sc-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const hole  = Number(btn.dataset.hole);
+      const delta = Number(btn.dataset.delta);
+      const rh    = activeRound.holes.find(h => h.hole === hole);
+      if (rh) { rh.strokes = Math.max(0, rh.strokes + delta); }
+      renderScorecard();
+      updateScoreChip();
+    });
+  });
+  const diff    = totalPar > 0 ? totalStrokes - totalPar : null;
+  const diffStr = diff === null ? "" : diff === 0 ? " (E)" : diff > 0 ? ` (+${diff})` : ` (${diff})`;
+  document.getElementById("scorecardTotals").textContent =
+    `Totalt: ${totalStrokes} slag${diffStr}`;
+}
+
+async function finishRound() {
+  if (!activeRound) return;
+  const btn = document.getElementById("finishRoundBtn");
+  btn.textContent = "Sparar…"; btn.disabled = true;
+  try {
+    const roundRef  = doc(collection(db, "rounds"));
+    let totalStrokes = 0, totalPar = 0;
+    activeRound.holes.forEach(h => {
+      totalStrokes += h.strokes;
+      if (h.par) totalPar += h.par;
+    });
+    await setDoc(roundRef, {
+      userId:       currentUid,
+      courseId:     activeRound.courseId,
+      courseName:   activeRound.courseName,
+      date:         activeRound.date,
+      holes:        activeRound.holes,
+      totalStrokes,
+      totalPar,
+      completed:    true
+    });
+  } catch(e) { console.error("Kunde inte spara runda:", e); }
+  activeRound = null;
+  updateScoreChip();
+  document.getElementById("scorecardOverlay").classList.remove("open");
+  btn.textContent = "Avsluta runda"; btn.disabled = false;
+}
+
+async function loadRounds() {
+  if (!currentUid) return [];
+  try {
+    const snap = await getDocs(query(
+      collection(db, "rounds"),
+      where("userId", "==", currentUid),
+      orderBy("date", "desc")
+    ));
+    return snap.docs.map(d => d.data());
+  } catch(e) { console.error("Kunde inte ladda rundor:", e); return []; }
+}
+
+async function openRoundHistory() {
+  document.getElementById("roundHistoryList").innerHTML =
+    '<div class="rounds-empty">Laddar…</div>';
+  document.getElementById("roundHistoryOverlay").classList.add("open");
+  const rounds = await loadRounds();
+  const list   = document.getElementById("roundHistoryList");
+  if (!rounds.length) {
+    list.innerHTML = '<div class="rounds-empty">Inga sparade rundor ännu.</div>';
+    return;
+  }
+  list.innerHTML = rounds.map(r => {
+    const d    = new Date(r.date);
+    const dateStr = d.toLocaleDateString("sv-SE", { day:"numeric", month:"short", year:"numeric" });
+    const diff = r.totalPar > 0 ? r.totalStrokes - r.totalPar : null;
+    const scoreStr = diff === null ? `${r.totalStrokes}` :
+                     diff === 0   ? "E" :
+                     diff > 0     ? `+${diff}` : `${diff}`;
+    return `<div class="round-item">
+      <div class="round-item-info">
+        <div class="round-item-name">${esc(r.courseName)}</div>
+        <div class="round-item-meta">${dateStr} · ${r.totalStrokes} slag${r.totalPar ? ` · Par ${r.totalPar}` : ""}</div>
+      </div>
+      <div class="round-item-score">${scoreStr}</div>
+    </div>`;
+  }).join("");
 }
 
 document.getElementById("courseFilterToggle").addEventListener("click", e => {
@@ -1784,6 +2108,7 @@ onAuthStateChanged(auth, async user => {
   } else {
     currentUid = null;
     pois = {}; greenEdits = {}; holeImages = {}; position = null;
+    holeDetails = {}; activeRound = null; playerHandicap = null;
     firestoreCourses = []; COURSES = [...BASE_COURSES];
     document.getElementById("authOverlay").classList.add("open");
     document.getElementById("welcomeOverlay").classList.remove("open");
@@ -1793,6 +2118,7 @@ onAuthStateChanged(auth, async user => {
     document.getElementById("clubsBtn").style.display = "none";
     document.getElementById("gpsStatus").textContent = "Ingen GPS";
     document.getElementById("gpsStatus").className = "gps bad";
+    updateScoreChip();
   }
 });
 </script>
