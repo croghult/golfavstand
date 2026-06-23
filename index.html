@@ -1954,6 +1954,34 @@ function renderCoursePicker() {
 }
 
 /* ---- Runda ---- */
+function persistRound() {
+  if (!currentUid) return;
+  if (activeRound) {
+    localStorage.setItem("activeRound_" + currentUid, JSON.stringify(activeRound));
+  } else {
+    localStorage.removeItem("activeRound_" + currentUid);
+  }
+}
+
+function restoreRound() {
+  if (!currentUid) return;
+  try {
+    const saved = localStorage.getItem("activeRound_" + currentUid);
+    if (!saved) return;
+    const round = JSON.parse(saved);
+    const course = COURSES.find(c => c.id === round.courseId);
+    if (!course) return;
+    activeRound   = round;
+    currentCourse = course;
+    currentHole   = course.holes[0].hole;
+    renderCourseSelect();
+    renderHoleChips();
+    renderReadout();
+    renderPois();
+    updateScoreChip();
+  } catch(e) { /* ignorera korrupt data */ }
+}
+
 function navigateToCourse(course, withRound) {
   currentCourse = course;
   currentHole   = course.holes[0].hole;
@@ -1977,6 +2005,7 @@ function navigateToCourse(course, withRound) {
   } else {
     activeRound = null;
   }
+  persistRound();
   updateScoreChip();
 }
 
@@ -2042,6 +2071,7 @@ function renderScorecard() {
       const delta = Number(btn.dataset.delta);
       const rh    = activeRound.holes.find(h => h.hole === hole);
       if (rh) { rh.strokes = Math.max(0, rh.strokes + delta); }
+      persistRound();
       renderScorecard();
       updateScoreChip();
     });
@@ -2075,6 +2105,7 @@ async function finishRound() {
     });
   } catch(e) { console.error("Kunde inte spara runda:", e); }
   activeRound = null;
+  persistRound();
   updateScoreChip();
   document.getElementById("scorecardOverlay").classList.remove("open");
   btn.textContent = "Avsluta runda"; btn.disabled = false;
@@ -2188,7 +2219,8 @@ onAuthStateChanged(auth, async user => {
     renderHoleChips();
     renderReadout();
     renderPois();
-    showWelcomeScreen();
+    restoreRound();
+    if (!activeRound) showWelcomeScreen();
   } else {
     currentUid = null;
     pois = {}; greenEdits = {}; holeImages = {}; position = null;
